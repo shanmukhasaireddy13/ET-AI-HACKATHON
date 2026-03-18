@@ -1,0 +1,26 @@
+# Core framework
+fastapi==0.109.0
+uvicorn==0.27.0
+python-multipart==0.0.6
+
+# Databases
+sqlalchemy==2.0.39
+pymongo>=4.10,<5
+
+# Agent runtime
+langgraph>=0.2.67,<0.4
+
+# Data validation
+pydantic==2.11.3
+
+# Configuration
+python-dotenv==1.0.0
+
+# Utilities
+python-dateutil==2.8.2
+pytz==2023.3
+httpx==0.25.2
+
+# Development / testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
