@@ -1,7 +1,7 @@
 """
 🔌 External API Integrations
 ==============================
-Reads credentials from the integrations DB table (user-configured).
+Reads OAuth credentials from the shared PostgreSQL database (written by Express).
 Falls back to .env if no DB credentials exist.
 """
 
@@ -13,7 +13,31 @@ load_dotenv()
 
 
 def _get_integration(service: str) -> dict:
-    """Load saved integration credentials from the database."""
+    """Load saved integration credentials from shared PostgreSQL."""
+    # Try PostgreSQL first (shared with Express)
+    try:
+        import psycopg2
+        conn = psycopg2.connect(
+            os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/sidd")
+        )
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT id, service, base_url, email, api_token, project_key, status, connected_at, extra FROM integrations WHERE service = %s AND status = 'connected'",
+            (service,)
+        )
+        row = cur.fetchone()
+        cur.close()
+        conn.close()
+        if row:
+            return {
+                "id": row[0], "service": row[1], "base_url": row[2],
+                "email": row[3], "api_token": row[4], "project_key": row[5],
+                "status": row[6], "connected_at": row[7], "extra": row[8] or "{}"
+            }
+    except Exception as e:
+        print(f"[Tool] PostgreSQL lookup failed ({e}), trying SQLite fallback...")
+    
+    # Fallback to local SQLite (for backward compatibility)
     try:
         from tools.database import _get_conn, init_db
         init_db()
@@ -28,15 +52,14 @@ def _get_integration(service: str) -> dict:
 
 
 # ═════════════════════════════════════════
-#  JIRA — READS FROM DB OR .ENV
+#  JIRA — READS FROM SHARED POSTGRES DB
 # ═════════════════════════════════════════
 
 def create_jira_ticket(title: str, description: str) -> dict:
     """
     Creates a real Jira ticket via the Jira Cloud REST API (v3).
-    Reads credentials from the integrations DB first, falls back to .env.
+    Reads OAuth credentials from the shared PostgreSQL database.
     """
-    # Try DB-saved credentials first
     integration = _get_integration("jira")
     
     if integration:
@@ -57,14 +80,35 @@ def create_jira_ticket(title: str, description: str) -> dict:
 
     try:
         import requests
-        from requests.auth import HTTPBasicAuth
+        
+        # Check if this is an OAuth token (has cloud_id in extras)
+        cloud_id = ""
+        if integration:
+            try:
+                extra = json.loads(integration.get("extra", "{}"))
+                cloud_id = extra.get("cloud_id", "")
+            except Exception:
+                pass
+        
+        if cloud_id:
+            # OAuth 2.0 — use Bearer token with cloud-scoped API
+            url = f"https://api.atlassian.com/ex/jira/{cloud_id}/rest/api/3/issue"
+            headers = {
+                "Authorization": f"Bearer {api_token}",
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+            }
+            auth = None
+        else:
+            # Legacy API token — use Basic Auth
+            from requests.auth import HTTPBasicAuth
+            url = f"{base_url}/rest/api/3/issue"
+            headers = {
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+            }
+            auth = HTTPBasicAuth(email, api_token)
 
-        url = f"{base_url}/rest/api/3/issue"
-        auth = HTTPBasicAuth(email, api_token)
-        headers = {
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-        }
         payload = json.dumps({
             "fields": {
                 "project": {"key": project_key},
@@ -99,32 +143,6 @@ def create_jira_ticket(title: str, description: str) -> dict:
 
     except Exception as e:
         print(f"[Tool] ❌ Jira API exception: {e}")
-        return {"status": "failed", "error": str(e)}
-
-
-def test_jira_connection(base_url: str, email: str, api_token: str) -> dict:
-    """Tests if Jira credentials are valid by fetching the current user."""
-    try:
-        import requests
-        from requests.auth import HTTPBasicAuth
-        
-        url = f"{base_url.rstrip('/')}/rest/api/3/myself"
-        auth = HTTPBasicAuth(email, api_token)
-        headers = {"Accept": "application/json"}
-        
-        response = requests.get(url, headers=headers, auth=auth, timeout=10)
-        
-        if response.status_code == 200:
-            user = response.json()
-            return {
-                "status": "success",
-                "user": user.get("displayName", ""),
-                "email": user.get("emailAddress", ""),
-                "account_id": user.get("accountId", "")
-            }
-        else:
-            return {"status": "failed", "error": f"HTTP {response.status_code}: {response.text[:200]}"}
-    except Exception as e:
         return {"status": "failed", "error": str(e)}
 
 
