@@ -4,50 +4,50 @@ from datetime import datetime
 def dispatcher_node(state: AgentState) -> dict:
     """
     🔀 DISPATCHER (Loop Controller)
-    Reads the dynamic_plan and decides which agent to route to next.
-    This node is called repeatedly — after each agent finishes, control
-    returns here to dispatch the next one.
-    
-    Flow:
-      Orchestrator → Dispatcher → Agent A → Dispatcher → Agent B → ... → Dispatcher → Executor
-    
-    Routing logic (used by graph.py's conditional edge):
-      - If more agents in plan → route to next agent
-      - If plan exhausted AND execution_queue has items → route to executor
-      - If plan exhausted AND no execution items → route to audit
+    Reads the dynamic_steps and decides where to route next.
     """
-    print("\n🔀 DISPATCHER: Checking dynamic plan...")
+    print("\n🔀 DISPATCHER: Checking dynamic steps queue...")
     
-    plan = state.get("dynamic_plan", [])
-    index = state.get("current_agent_index", 0)
-    completed = state.get("completed_agents", [])
+    steps = state.get("dynamic_steps", [])
+    waiting = state.get("waiting_agents", {})
+    completed = state.get("completed_steps", [])
     
-    if index < len(plan):
-        next_agent = plan[index]
-        print(f"   ➡️  Next agent: {next_agent} (step {index + 1}/{len(plan)})")
-        print(f"   ✅ Completed so far: {completed}")
+    if steps:
+        next_step = steps[0]
+        role = next_step.get("role", "Unknown")
+        print(f"   ➡️  Next dynamic step role: {role} ({len(steps)} remaining)")
+        if waiting:
+            print(f"   ⏳ Waiting: {list(waiting.keys())}")
+        print(f"   ✅ Completed so far: {len(completed)} steps")
+    elif waiting:
+        print(f"   ⚠️  Deadlock or waiting state reached!")
+        print(f"   ⏳ Waiting on: {waiting}")
+        print(f"   ✅ Completed so far: {len(completed)}")
     else:
         queue_size = len(state.get("execution_queue", []))
-        print(f"   📋 All {len(plan)} agents completed: {completed}")
+        print(f"   📋 All dynamic steps completed: {len(completed)} total")
         print(f"   📦 Execution queue has {queue_size} actions")
     
-    # Dispatcher doesn't modify state — routing is handled by
-    # the conditional edge function in graph.py
     return {}
 
 
 def get_next_route(state: AgentState) -> str:
     """
     Routing function used by graph.py's conditional edges.
-    Called after dispatcher to determine the next node.
     """
-    plan = state.get("dynamic_plan", [])
-    index = state.get("current_agent_index", 0)
+    steps = state.get("dynamic_steps", [])
     
-    # More agents to run?
-    if index < len(plan):
-        return plan[index]
+    # More dynamic steps to run?
+    if steps:
+        return "dynamic_agent"
     
+    waiting = state.get("waiting_agents", {})
+    if waiting:
+        queue = state.get("execution_queue", [])
+        if queue:
+            return "executor"
+        return "audit"
+        
     # All agents done — check if there are tool calls to execute
     queue = state.get("execution_queue", [])
     if queue:
