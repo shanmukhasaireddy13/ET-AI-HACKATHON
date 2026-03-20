@@ -1,21 +1,15 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import Navbar from "@/components/ui/Navbar";
+import { Inter } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
 });
 
 export const metadata: Metadata = {
-  title: "Agent Monitor Dashboard",
-  description: "Dynamic Multi-Agent System UI",
+  title: "SIDD — Autonomous Enterprise AI",
+  description: "Multi-agent system for autonomous enterprise workflows. Detect failures, self-correct, and complete complex processes with minimal human involvement.",
 };
 
 export default function RootLayout({
@@ -24,14 +18,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        <Navbar />
-        <main className="pt-24 pb-12 px-6 max-w-7xl mx-auto min-h-screen">
-          {children}
-        </main>
+    <html lang="en">
+      <body className={`${inter.variable} antialiased`}>
+        {children}
       </body>
     </html>
   );
