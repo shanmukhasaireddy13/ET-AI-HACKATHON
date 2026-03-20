@@ -48,7 +48,7 @@ export default function MeetingList({ meetings, loading }: MeetingListProps) {
     <div className="space-y-4">
       {meetings.map((meeting) => (
         <Link 
-          href={`/meetings/${meeting.id}`} 
+          href={`/dashboard/meetings/${meeting.id}`} 
           key={meeting.id}
           className="block glass-panel p-5 hover:bg-white/[0.03] transition-colors border border-transparent hover:border-primary/30 group"
         >
