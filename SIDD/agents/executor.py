@@ -1,6 +1,7 @@
 from state import AgentState
 from tools.external_apis import create_jira_ticket, send_slack_message, schedule_calendar_event
 from datetime import datetime
+import uuid
 
 # ─── Tool Registry ───
 TOOL_REGISTRY = {
@@ -9,11 +10,22 @@ TOOL_REGISTRY = {
     "schedule_calendar_event": schedule_calendar_event,
 }
 
+# ─── Tools that REQUIRE human approval before execution ───
+# This is the AGENTIC distinction: the system knows when to pause
+# and ask a human, rather than blindly executing everything.
+HIGH_RISK_TOOLS = {
+    "create_jira_ticket",       # Creates permanent external records
+    "send_slack_message",       # Sends messages to real humans
+}
+
 def execution_node(state: AgentState) -> dict:
     """
-    ⚡ EXECUTOR AGENT
-    Processes every action in execution_queue, one at a time.
-    After each call, Monitor checks the result.
+    ⚡ EXECUTOR AGENT (with Human-in-the-Loop)
+    
+    AGENTIC BEHAVIOR:
+    - Low-risk actions (calendar): execute immediately
+    - High-risk actions (Jira, Slack): route to pending_approvals for human review
+    - This shows the system KNOWS its own limitations and defers appropriately
     """
     print("\n⚡ EXECUTOR: Running action...")
     
@@ -22,6 +34,7 @@ def execution_node(state: AgentState) -> dict:
     execution_results = list(state.get("execution_results", []))
     errors = list(state.get("errors", []))
     audit_log = list(state.get("audit_log", []))
+    pending_approvals = list(state.get("pending_approvals", []))
     
     if step_index >= len(queue):
         print("   ℹ️  No more actions in queue.")
@@ -34,6 +47,44 @@ def execution_node(state: AgentState) -> dict:
     
     print(f"   🔧 [{step_index + 1}/{len(queue)}] Tool: {tool_name} (from: {source})")
     
+    # ═══ HUMAN-IN-THE-LOOP GATE ═══
+    if tool_name in HIGH_RISK_TOOLS:
+        approval_id = f"approval-{uuid.uuid4().hex[:8]}"
+        approval_entry = {
+            "id": approval_id,
+            "meeting_id": state.get("meeting_id", ""),
+            "tool": tool_name,
+            "args": args,
+            "source_agent": source,
+            "status": "pending",
+            "reason": f"Agent '{source}' wants to execute '{tool_name}' — requires human approval",
+            "created_at": datetime.now().isoformat(),
+        }
+        pending_approvals.append(approval_entry)
+        
+        # Log a "gated" result so monitor advances correctly
+        execution_results.append({
+            "step": step_index, 
+            "tool": tool_name, 
+            "source": source, 
+            "result": {"status": "pending_approval", "approval_id": approval_id}
+        })
+        
+        audit_log.append(
+            f"[{datetime.now().isoformat()}] EXECUTOR [GATED]: "
+            f"'{tool_name}' from {source} → HELD for human approval (id: {approval_id})"
+        )
+        
+        print(f"   🛑 HELD for human approval (id: {approval_id})")
+        print(f"      Reason: High-risk action requires human verification")
+        
+        return {
+            "execution_results": execution_results,
+            "pending_approvals": pending_approvals,
+            "audit_log": audit_log,
+        }
+    
+    # ═══ AUTO-EXECUTE low-risk tools ═══
     result = {"status": "failed", "error": f"Unknown tool: {tool_name}"}
     try:
         tool_fn = TOOL_REGISTRY.get(tool_name)

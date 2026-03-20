@@ -4,20 +4,27 @@ class AgentState(TypedDict):
     """
     Shared state for the dynamic multi-agent workflow.
     All agents read from and write to this state.
-    The key innovation is `dynamic_plan` — an ordered list of agent names
-    that the Orchestrator builds and agents can modify at runtime.
+    
+    AGENTIC DESIGN:
+    - dynamic_steps: LLM-generated workflow plan (not hardcoded)
+    - agent_reasoning: per-agent explanations of WHY decisions were made
+    - pending_approvals: human-in-the-loop gates for critical actions
     """
     
     # ─── INPUT ───
     meeting_transcript: str
+    meeting_id: str
     
     # ─── DYNAMIC WORKFLOW ENGINE ───
-    dynamic_plan: List[str]          # ordered list of agent names to invoke, e.g. ["task_divider", "scheduler"]
-    current_agent_index: int         # which agent in the plan we're currently at
-    completed_agents: List[str]      # agents that have already run
+    dynamic_steps: List[Dict[str, Any]]   # queue of {"role": "...", "auto_prompt": "..."}
+    waiting_agents: Dict[str, List[str]]  # agent/role -> list of items it's waiting on
+    completed_steps: List[Dict[str, Any]] # steps that have already run
     
     # ─── ORCHESTRATOR ANALYSIS ───
     orchestrator_reasoning: str      # LLM's reasoning for why it chose this plan
+    
+    # ─── AGENTIC: PER-AGENT REASONING TRAIL ───
+    agent_reasoning: List[Dict[str, Any]]  # [{"agent": "...", "reasoning": "...", "outputs": [...]}]
     
     # ─── SPECIALIZED AGENT OUTPUTS ───
     meeting_summary: str
@@ -30,6 +37,9 @@ class AgentState(TypedDict):
     execution_queue: List[Dict[str, Any]]   # all tool calls queued by agents
     current_step_index: int                 # position in execution_queue
     execution_results: List[Dict[str, Any]]
+    
+    # ─── HUMAN-IN-THE-LOOP ───
+    pending_approvals: List[Dict[str, Any]]  # actions waiting for human approval
     
     # ─── MONITORING & RECOVERY ───
     errors: List[str]

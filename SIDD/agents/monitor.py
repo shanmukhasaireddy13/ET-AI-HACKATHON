@@ -39,11 +39,13 @@ def get_monitor_route(state: AgentState) -> str:
     queue = state.get("execution_queue", [])
     current_index = state.get("current_step_index", 0)
     
-    # Check for failure
+    # Check for failure (but not pending_approval — that's intentional gating)
     if execution_results:
         last = execution_results[-1].get("result", {})
-        if last.get("status") == "failed":
+        status = last.get("status", "")
+        if status == "failed":
             return "recovery"
+        # pending_approval is not a failure — it's an intentional human gate
     
     # More steps?
     if current_index < len(queue):
