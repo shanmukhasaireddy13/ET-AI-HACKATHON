@@ -1,81 +1,101 @@
+import json
 from state import AgentState
 from utils.llm import call_gemini_safe
 from datetime import datetime
 
-# ─── Available agents ───
-AVAILABLE_AGENTS = {
-    "task_divider":  "Breaks work into assignable sub-tasks with owners and deadlines",
-    "scheduler":     "Handles meeting scheduling, calendar events, and time slots",
-    "bug_tracker":   "Creates bug/issue tickets and tracks defects",
-    "followup":      "Generates follow-up reminders and pending action checks",
-    "summary":       "Produces a concise meeting summary or recap",
-}
+ORCHESTRATOR_PROMPT = """You are the master orchestrator of a dynamic multi-agent system.
+Your job is to analyze input (a meeting transcript, conversation, or request) and dynamically create a sequence of tailored workflow steps for specialized agents to execute.
 
-ORCHESTRATOR_PROMPT = """You are the orchestrator of a multi-agent AI workflow system.
-Your job is to analyze a meeting transcript and decide which specialized agents should handle it.
-
-Available agents:
-{agents_desc}
-
-Meeting Transcript:
+Input:
 \"\"\"{transcript}\"\"\"
 
-Analyze the transcript and determine:
-1. Which agents are needed (can be multiple)
-2. The optimal order to run them
-3. Your reasoning
+═══ AVAILABLE TOOLS (what you can instruct agents to use) ═══
+
+1. create_jira_ticket(title: str, description: str)
+   → Creates a real Jira ticket. Use when tasks, bugs, or action items need tracking.
+
+2. send_slack_message(channel: str, message: str)
+   → Sends a Slack notification. Use for alerts, updates, or follow-up reminders.
+
+3. schedule_calendar_event(title: str, time: str, attendees: list)
+   → Schedules a calendar meeting/event. Use when follow-up meetings are needed.
+
+═══ AVAILABLE DATA OUTPUTS (what agents can produce) ═══
+
+Agents can populate these structured outputs:
+- meeting_summary: A text summary of the input
+- assigned_tasks: List of {{\"task\": "...", \"assignee\": "...", \"priority\": "high/medium/low"}}
+- scheduled_events: List of {{\"title\": "...", \"time\": "...", \"attendees\": [...]}}
+- bug_tickets: List of {{\"title\": "...", \"severity\": "...", \"description\": "..."}}
+- followup_items: List of {{\"item\": "...", \"owner\": "..."}}
+- execution_queue: List of tool calls to execute: {{\"tool\": "<tool_name>", \"args\": {{...}}, \"source_agent\": "<role>"}}
+
+═══ YOUR TASK ═══
+
+Analyze the input and create a workflow plan. For each step, define:
+- A role name for the agent
+- A detailed auto_prompt instruction telling the agent EXACTLY what to extract/produce
+- In the auto_prompt, tell the agent WHICH data outputs to populate and WHICH tools to queue
 
 IMPORTANT: Return ONLY a valid JSON object in this exact format, no other text:
 {{
-    "agents": ["agent_name_1", "agent_name_2"],
-    "reasoning": "Brief explanation of why these agents were selected and in this order"
+    "steps": [
+        {{
+            "role": "AgentRoleName", 
+            "auto_prompt": "Detailed instruction including which outputs to populate and which tools to call with what arguments"
+        }}
+    ],
+    "reasoning": "Brief explanation of why you designed this workflow."
 }}
 
 Rules:
-- Only use agent names from the available list above
-- Order matters: put prerequisite agents first
-- If the transcript is general with no specific actionable items, use ["summary"]
-- You can select 1 to all 5 agents based on what the meeting actually needs
+- Create as many steps as needed based on the input content
+- Each auto_prompt MUST be extremely specific about the transcript content  
+- If tasks are found, include a step that queues create_jira_ticket tool calls
+- If meetings/events are mentioned, include a step that queues schedule_calendar_event
+- If notifications are needed, include a step that queues send_slack_message
+- Always include at least a summarizer step
+- Tool calls in execution_queue MUST use format: {{"tool": "<name>", "args": {{...}}, "source_agent": "<role>"}}
 """
 
 def orchestrator_node(state: AgentState) -> dict:
     """
-    🧠 ORCHESTRATOR (Gemini Flash Powered)
-    Analyzes the meeting transcript and DYNAMICALLY builds a plan of agents.
+    🧠 ORCHESTRATOR 
+    Analyzes the meeting transcript and DYNAMICALLY builds a sequence of steps with tailored auto-prompts.
+    Now includes full awareness of available tools so the LLM can design actionable workflows.
     """
     print("\n" + "=" * 60)
-    print("🧠 ORCHESTRATOR: Analyzing transcript with Gemini Flash...")
+    print("🧠 ORCHESTRATOR: Generating dynamic auto-prompts...")
     print("=" * 60)
     
     transcript = state.get("meeting_transcript", "")
     
-    # Build the available agents description
-    agents_desc = "\n".join([f"- {name}: {desc}" for name, desc in AVAILABLE_AGENTS.items()])
+    # ═══ CALL LLM ═══
+    prompt = ORCHESTRATOR_PROMPT.format(transcript=transcript)
     
-    # ═══ CALL GEMINI FLASH ═══
-    prompt = ORCHESTRATOR_PROMPT.format(agents_desc=agents_desc, transcript=transcript)
+    result = call_gemini_safe(
+        prompt, 
+        fallback={
+            "steps": [{"role": "Summarizer", "auto_prompt": "Summarize the transcript and populate meeting_summary."}], 
+            "reasoning": "Fallback to basic summary."
+        }
+    )
     
-    result = call_gemini_safe(prompt, fallback={"agents": ["summary"], "reasoning": "Fallback: defaulting to summary"})
-    
-    selected_agents = result.get("agents", ["summary"])
+    steps = result.get("steps", [{"role": "Summarizer", "auto_prompt": "Summarize the transcript and populate meeting_summary."}])
     reasoning = result.get("reasoning", "No reasoning provided")
     
-    # Validate agent names
-    valid_agents = [a for a in selected_agents if a in AVAILABLE_AGENTS]
-    if not valid_agents:
-        valid_agents = ["summary"]
-        reasoning += " (Invalid agents filtered, defaulting to summary)"
-    
-    print(f"\n   📋 Dynamic Plan: {valid_agents}")
+    print(f"\n   📋 Dynamic Steps Created: {len(steps)}")
+    for s in steps:
+        print(f"      - [{s.get('role')}]: {s.get('auto_prompt', '')[:80]}...")
     print(f"   💭 Reasoning: {reasoning}")
     
     audit_log = state.get("audit_log", [])
-    audit_log.append(f"[{datetime.now().isoformat()}] ORCHESTRATOR: Plan={valid_agents} | Reason={reasoning}")
+    audit_log.append(f"[{datetime.now().isoformat()}] ORCHESTRATOR: Created {len(steps)} dynamic steps | Reason={reasoning}")
     
     return {
-        "dynamic_plan": valid_agents,
-        "current_agent_index": 0,
-        "completed_agents": [],
+        "dynamic_steps": steps,
+        "waiting_agents": {},
+        "completed_steps": [],
         "orchestrator_reasoning": reasoning,
         "audit_log": audit_log,
     }

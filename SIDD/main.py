@@ -8,16 +8,19 @@ Demonstrates truly dynamic workflow where:
 """
 
 from graph import build_graph
+from tools.database import save_meeting_results
 
 
 def create_empty_state(transcript: str) -> dict:
     """Creates a fresh initial state."""
     return {
         "meeting_transcript": transcript,
-        "dynamic_plan": [],
-        "current_agent_index": 0,
-        "completed_agents": [],
+        "meeting_id": "",
+        "dynamic_steps": [],
+        "waiting_agents": {},
+        "completed_steps": [],
         "orchestrator_reasoning": "",
+        "agent_reasoning": [],
         "meeting_summary": "",
         "assigned_tasks": [],
         "scheduled_events": [],
@@ -26,43 +29,11 @@ def create_empty_state(transcript: str) -> dict:
         "execution_queue": [],
         "current_step_index": 0,
         "execution_results": [],
+        "pending_approvals": [],
         "errors": [],
         "recovery_actions": [],
         "audit_log": [],
     }
-
-
-# ════════════════════════════════════════════════════════
-#  TEST SCENARIOS
-# ════════════════════════════════════════════════════════
-
-TEST_SCENARIOS = {
-    # ─── Single intent ───
-    "pure_bug_report": (
-        "We found a critical bug — the login page crashes on mobile devices. "
-        "Create a Jira ticket immediately and flag it as high priority."
-    ),
-
-    # ─── Multi-intent (this is the key test!) ───
-    "task_and_scheduling": (
-        "Assign the frontend redesign task to the design team and split the work. "
-        "Also schedule a follow-up meeting tomorrow at 10 AM to review progress."
-    ),
-
-    # ─── Complex multi-intent ───
-    "full_meeting": (
-        "Team, we need to assign the API refactoring to backend and divide it into subtasks. "
-        "There's also a critical bug — the payment page is broken, create a ticket. "
-        "Schedule a review meeting for next week with the whole team. "
-        "And follow up with DevOps on the deployment status."
-    ),
-
-    # ─── Fallback / summary only ───
-    "general_discussion": (
-        "We had a great discussion about the company roadmap and future vision. "
-        "Please summarize the key points from today's meeting."
-    ),
-}
 
 
 def run_scenario(graph, name: str, transcript: str):
@@ -74,11 +45,18 @@ def run_scenario(graph, name: str, transcript: str):
     
     state = create_empty_state(transcript)
     
-    final_state = None
+    # Stream through graph, accumulating state updates
+    accumulated_state = dict(state)
     for step_output in graph.stream(state):
         for node_name, updates in step_output.items():
-            pass  # agents print their own output
-        final_state = step_output
+            if isinstance(updates, dict):
+                accumulated_state.update(updates)
+    
+    # 💾 Persist to SQLite
+    try:
+        meeting_id = save_meeting_results(accumulated_state)
+    except Exception as e:
+        print(f"   ⚠️  DB save failed: {e}")
     
     print(f"\n{'#' * 70}")
     print(f"# ✅ SCENARIO '{name.upper()}' COMPLETE")
@@ -87,17 +65,31 @@ def run_scenario(graph, name: str, transcript: str):
 
 def main():
     print("=" * 70)
-    print("🚀 DYNAMIC MULTI-AGENT WORKFLOW ENGINE")
+    print("🚀 DYNAMIC MULTI-AGENT WORKFLOW ENGINE (Groq Integration)")
     print("   No hardcoded routes — agents decide the flow!")
     print("=" * 70)
     
     graph = build_graph()
     
-    for name, transcript in TEST_SCENARIOS.items():
-        run_scenario(graph, name, transcript)
-        print("\n" + "─" * 70 + "\n")
+    print("\nType your meeting transcript or request below.")
+    print("Type 'exit' or 'quit' to stop.\n")
     
-    print("✅ All scenarios completed!")
+    scenario_count = 1
+    while True:
+        try:
+            user_input = input(f"[{scenario_count}] Enter transcript: ")
+            if user_input.lower().strip() in ['exit', 'quit']:
+                break
+            if not user_input.strip():
+                continue
+            
+            run_scenario(graph, f"User_Scenario_{scenario_count}", user_input)
+            scenario_count += 1
+            print("\n" + "─" * 70 + "\n")
+        except KeyboardInterrupt:
+            break
+            
+    print("✅ Session completed!")
 
 
 if __name__ == "__main__":

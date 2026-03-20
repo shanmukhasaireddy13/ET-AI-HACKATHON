@@ -2,16 +2,16 @@
 🧠 LangGraph Orchestrator — TRULY DYNAMIC WORKFLOW
 ====================================================
 The workflow is NOT pre-defined. The Orchestrator LLM analyzes the input
-and builds a dynamic_plan. The Dispatcher loops through the plan, routing
-to each agent. Agents can ADD more agents to the plan at runtime.
+and builds dynamic_steps. The Dispatcher loops through the plan, routing
+to the dynamic_agent which executes auto-prompts.
 
 FLOW:
-  Input → Orchestrator (builds dynamic plan)
+  Input → Orchestrator (builds dynamic step sequence)
             ↓
         Dispatcher ←──────────────────────────────┐
             ↓                                     │
      [Dynamic Agent] ─────────────────────────────┘
-     (agent advances index, may add more agents)
+     (executes auto-prompt, generates JSON outputs)
             
      When plan is exhausted:
         Dispatcher → Executor ←───────────────┐
@@ -28,14 +28,10 @@ from state import AgentState
 
 from agents.orchestrator import orchestrator_node
 from agents.dispatcher import dispatcher_node, get_next_route
-from agents.task_divider import task_divider_node
-from agents.scheduler import scheduler_node
-from agents.bug_tracker import bug_tracker_node
-from agents.followup import followup_node
-from agents.summary import summary_node
+from agents.dynamic_agent import dynamic_agent_node
 from agents.executor import execution_node
 from agents.monitor import monitor_node, get_monitor_route
-from agents.recovery import recovery_node
+from agents.recovery import recovery_node, get_recovery_route
 from agents.audit import audit_node
 
 
@@ -47,11 +43,7 @@ def build_graph():
     # ═══ REGISTER ALL NODES ═══
     builder.add_node("orchestrator",  orchestrator_node)
     builder.add_node("dispatcher",    dispatcher_node)
-    builder.add_node("task_divider",  task_divider_node)
-    builder.add_node("scheduler",     scheduler_node)
-    builder.add_node("bug_tracker",   bug_tracker_node)
-    builder.add_node("followup",      followup_node)
-    builder.add_node("summary",       summary_node)
+    builder.add_node("dynamic_agent", dynamic_agent_node)
     builder.add_node("executor",      execution_node)
     builder.add_node("monitor",       monitor_node)
     builder.add_node("recovery",      recovery_node)
@@ -63,26 +55,21 @@ def build_graph():
     # ═══ Orchestrator → Dispatcher (always) ═══
     builder.add_edge("orchestrator", "dispatcher")
     
-    # ═══ Dispatcher → Dynamic routing (reads plan) ═══
+    # ═══ Dispatcher → Dynamic routing (reads dynamic_steps) ═══
     builder.add_conditional_edges(
         "dispatcher",
         get_next_route,
         {
-            "task_divider": "task_divider",
-            "scheduler":    "scheduler",
-            "bug_tracker":  "bug_tracker",
-            "followup":     "followup",
-            "summary":      "summary",
-            "executor":     "executor",
-            "audit":        "audit",
+            "dynamic_agent": "dynamic_agent",
+            "executor":      "executor",
+            "audit":         "audit",
         }
     )
     
-    # ═══ Every specialized agent → back to Dispatcher ═══
+    # ═══ Dynamic Agent → back to Dispatcher ═══
     # This creates the dynamic loop: agent finishes → dispatcher checks
-    # if more agents in plan → routes to next one
-    for agent in ["task_divider", "scheduler", "bug_tracker", "followup", "summary"]:
-        builder.add_edge(agent, "dispatcher")
+    # if more steps in plan → routes to next one
+    builder.add_edge("dynamic_agent", "dispatcher")
     
     # ═══ Execution Pipeline ═══
     builder.add_edge("executor", "monitor")
@@ -97,7 +84,14 @@ def build_graph():
         }
     )
     
-    builder.add_edge("recovery", "audit")
+    builder.add_conditional_edges(
+        "recovery",
+        get_recovery_route,
+        {
+            "executor": "executor",
+            "audit":    "audit",
+        }
+    )
     
     # ═══ TERMINAL ═══
     builder.add_edge("audit", END)
