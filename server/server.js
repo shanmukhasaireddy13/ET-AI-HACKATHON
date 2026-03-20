@@ -300,6 +300,82 @@ app.post("/api/approvals/:taskId/decision", async (req, res) => {
   }
 });
 
+app.get("/api/reasoning/:meetingId", async (req, res) => {
+  try {
+    const data = await callPython(req, "get", `/api/reasoning/${req.params.meetingId}`);
+    res.json({ success: true, request_id: req.requestId, data });
+  } catch (error) {
+    const gatewayError = buildGatewayError(error);
+    res.status(gatewayError.status).json({
+      error: "Failed to fetch reasoning",
+      detail: gatewayError.detail,
+      request_id: req.requestId,
+    });
+  }
+});
+
+// ═══ INTEGRATIONS ═══
+
+app.get("/api/integrations", async (req, res) => {
+  try {
+    const data = await callPython(req, "get", "/api/integrations");
+    res.json({ success: true, request_id: req.requestId, data });
+  } catch (error) {
+    const gatewayError = buildGatewayError(error);
+    res.status(gatewayError.status).json({
+      error: "Failed to fetch integrations",
+      detail: gatewayError.detail,
+      request_id: req.requestId,
+    });
+  }
+});
+
+app.post("/api/integrations/jira/test", async (req, res) => {
+  try {
+    const data = await callPython(req, "post", "/api/integrations/jira/test", {
+      data: req.body,
+    });
+    res.json({ success: true, request_id: req.requestId, data });
+  } catch (error) {
+    const gatewayError = buildGatewayError(error);
+    res.status(gatewayError.status).json({
+      error: "Failed to test Jira connection",
+      detail: gatewayError.detail,
+      request_id: req.requestId,
+    });
+  }
+});
+
+app.post("/api/integrations/jira", async (req, res) => {
+  try {
+    const data = await callPython(req, "post", "/api/integrations/jira", {
+      data: req.body,
+    });
+    res.json({ success: true, request_id: req.requestId, data });
+  } catch (error) {
+    const gatewayError = buildGatewayError(error);
+    res.status(gatewayError.status).json({
+      error: "Failed to connect Jira",
+      detail: gatewayError.detail,
+      request_id: req.requestId,
+    });
+  }
+});
+
+app.delete("/api/integrations/jira", async (req, res) => {
+  try {
+    const data = await callPython(req, "delete", "/api/integrations/jira");
+    res.json({ success: true, request_id: req.requestId, data });
+  } catch (error) {
+    const gatewayError = buildGatewayError(error);
+    res.status(gatewayError.status).json({
+      error: "Failed to disconnect Jira",
+      detail: gatewayError.detail,
+      request_id: req.requestId,
+    });
+  }
+});
+
 app.use((req, res) => {
   res.status(404).json({
     error: "Not found",
