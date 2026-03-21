@@ -1,4 +1,4 @@
-import { callPython } from "../utils/pythonClient.js";
+import { callPython, pythonClient } from "../utils/pythonClient.js";
 
 export async function getAuditLogs(req, res) {
   try {
@@ -53,3 +53,43 @@ export async function healthCheck(req, res) {
     res.json({ status: "ok", service: "sidd-gateway", backend: "unreachable" });
   }
 }
+
+export async function chat(req, res) {
+  try {
+    const pythonUrl = `${process.env.PYTHON_API_URL || "http://localhost:8000"}/api/chat`;
+    
+    const response = await fetch(pythonUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(req.body),
+    });
+    
+    if (!response.ok) {
+      return res.status(response.status).json({ error: "Python backend error" });
+    }
+
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.setHeader("Transfer-Encoding", "chunked");
+    
+    // Pipe the readable stream from Python to the Express response
+    const reader = response.body.getReader();
+    const pump = async () => {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+          res.end();
+          return;
+        }
+        res.write(value);
+      }
+    };
+    
+    await pump();
+  } catch (err) {
+    console.error("Chat proxy error:", err);
+    if (!res.headersSent) {
+      res.status(500).json({ error: "Failed to process chat" });
+    }
+  }
+}
+
