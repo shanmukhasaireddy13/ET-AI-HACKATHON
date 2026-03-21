@@ -10,6 +10,7 @@ import meetingsRouter from "./routes/meetings.js";
 import approvalsRouter from "./routes/approvals.js";
 import integrationsRouter from "./routes/integrations.js";
 import agentRouter from "./routes/agent.js";
+import authRouter from "./routes/auth.js";
 
 const app = express();
 
@@ -21,6 +22,7 @@ app.use(requestLogger);
 
 // ─── Routes ───
 app.get("/health", healthCheck);
+app.use("/api/auth", authRouter);
 app.use("/api/meetings", meetingsRouter);
 app.use("/api/dashboard/meetings", (req, _res, next) => { req.url = "/dashboard" + req.url; next(); }, meetingsRouter);
 app.use("/api/dashboard/overview", (req, _res, next) => { req.url = "/overview"; next(); }, meetingsRouter);

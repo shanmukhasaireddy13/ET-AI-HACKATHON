@@ -111,6 +111,113 @@ async def process_agent(req: AgentProcessRequest, background_tasks: BackgroundTa
     }
 
 
+class ChatRequest(BaseModel):
+    messages: list
+
+
+from fastapi.responses import StreamingResponse
+
+@app.post("/api/chat")
+async def chat_endpoint(req: ChatRequest):
+    """
+    Chat endpoint — streams structured JSON-line events for the frontend
+    workflow visualization. Each line is a JSON object with a 'type' field.
+    """
+    init_db()
+    
+    user_messages = [m for m in req.messages if m.get("role") == "user"]
+    if not user_messages:
+        return StreamingResponse(
+            iter([json.dumps({"type": "error", "message": "No user message provided."}) + "\n"]),
+            media_type="text/plain"
+        )
+    
+    transcript = user_messages[-1].get("content", "")
+    if not transcript.strip():
+        return StreamingResponse(
+            iter([json.dumps({"type": "error", "message": "Empty message received."}) + "\n"]),
+            media_type="text/plain"
+        )
+    
+    meeting_id = f"mtg-{uuid.uuid4().hex[:8]}"
+    
+    def emit(event_type, **kwargs):
+        return json.dumps({"type": event_type, **kwargs}) + "\n"
+    
+    def generate():
+        try:
+            yield emit("status", message=f"Starting agent analysis for meeting {meeting_id}...")
+            
+            graph = build_graph()
+            state = create_empty_state(transcript)
+            state["meeting_id"] = meeting_id
+            
+            accumulated_state = dict(state)
+            for step_output in graph.stream(state):
+                for node_name, updates in step_output.items():
+                    yield emit("node_start", node=node_name)
+                    if isinstance(updates, dict):
+                        accumulated_state.update(updates)
+                    yield emit("node_complete", node=node_name)
+            
+            # Save results
+            try:
+                conn = _get_conn()
+                conn.execute("DELETE FROM meetings WHERE id = ?", (meeting_id,))
+                conn.commit()
+                conn.close()
+                save_meeting_results(accumulated_state)
+            except Exception as e:
+                yield emit("warning", message=f"Could not save results — {e}")
+            
+            # Emit summary
+            summary = accumulated_state.get("meeting_summary", "")
+            if summary:
+                yield emit("summary", content=summary)
+            
+            # Emit tasks
+            tasks = accumulated_state.get("assigned_tasks", [])
+            if tasks:
+                yield emit("tasks", data=tasks)
+            
+            # Emit scheduled events
+            events = accumulated_state.get("scheduled_events", [])
+            if events:
+                yield emit("events", data=events)
+            
+            # Emit bug tickets
+            bugs = accumulated_state.get("bug_tickets", [])
+            if bugs:
+                yield emit("bugs", data=bugs)
+            
+            # Emit follow-up items
+            followups = accumulated_state.get("followup_items", [])
+            if followups:
+                yield emit("followups", data=followups)
+            
+            # Emit pending approvals
+            approvals = accumulated_state.get("pending_approvals", [])
+            if approvals:
+                safe_approvals = []
+                for a in approvals:
+                    safe_approvals.append({k: str(v) for k, v in a.items()})
+                yield emit("approvals", data=safe_approvals)
+            
+            # Emit agent reasoning
+            reasoning = accumulated_state.get("agent_reasoning", [])
+            if reasoning:
+                yield emit("reasoning", data=reasoning)
+            
+            yield emit("done", meeting_id=meeting_id)
+            
+        except Exception as e:
+            import traceback
+            yield emit("error", message=str(e))
+            traceback.print_exc()
+    
+    return StreamingResponse(generate(), media_type="text/plain; charset=utf-8")
+
+
 # ═══════════════════════════════════════════
 #  AGENT DATA (for Express to read results)
 # ═══════════════════════════════════════════

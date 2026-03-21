@@ -1,15 +1,27 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { DM_Sans, Instrument_Serif, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({
-  variable: "--font-inter",
+const dmSans = DM_Sans({
+  variable: "--font-sans",
+  subsets: ["latin"],
+});
+
+const instrumentSerif = Instrument_Serif({
+  variable: "--font-instrument-serif",
+  weight: "400",
+  style: ["normal", "italic"],
+  subsets: ["latin"],
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  variable: "--font-geist-mono", // keep the variable name consistent with shadcn/tailwindcss default for mono
   subsets: ["latin"],
 });
 
 export const metadata: Metadata = {
-  title: "SIDD — Autonomous Enterprise AI",
-  description: "Multi-agent system for autonomous enterprise workflows. Detect failures, self-correct, and complete complex processes with minimal human involvement.",
+  title: "MeetingMind",
+  description: "Turn Every Meeting Into Actionable Intelligence.",
 };
 
 export default function RootLayout({
@@ -18,10 +30,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className={`${inter.variable} antialiased`}>
-        {children}
-      </body>
+    <html
+      lang="en"
+      className={`${dmSans.variable} ${instrumentSerif.variable} ${jetbrainsMono.variable} h-full antialiased`}
+    >
+      <body className="min-h-full flex flex-col font-sans text-body">{children}</body>
     </html>
   );
 }
