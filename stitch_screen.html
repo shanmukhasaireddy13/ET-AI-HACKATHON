@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Linearity Graphite - Dashboard Hub</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface-container-low": "#f0f4f7",
+              "surface-container-highest": "#d9e4ea",
+              "surface-container": "#e8eff3",
+              "on-primary": "#f8f8f8",
+              "on-primary-fixed": "#3f3f3f",
+              "tertiary-fixed-dim": "#d2d8e0",
+              "on-tertiary-container": "#4e545b",
+              "inverse-on-surface": "#9a9d9f",
+              "surface-tint": "#5e5e5e",
+              "primary-fixed": "#e2e2e2",
+              "on-secondary": "#f9f8ff",
+              "on-background": "#2a3439",
+              "inverse-surface": "#0b0f10",
+              "on-tertiary-fixed": "#3b4248",
+              "on-error": "#fff7f7",
+              "secondary-fixed": "#d8e2ff",
+              "surface-container-high": "#e1e9ee",
+              "outline": "#717c82",
+              "primary-dim": "#525252",
+              "tertiary-dim": "#4d545a",
+              "on-tertiary": "#f6f9ff",
+              "secondary-fixed-dim": "#c3d4ff",
+              "on-surface": "#2a3439",
+              "surface-dim": "#cfdce3",
+              "on-secondary-fixed": "#003c86",
+              "surface-bright": "#f7f9fb",
+              "error-dim": "#4f0116",
+              "on-surface-variant": "#566166",
+              "surface-container-lowest": "#ffffff",
+              "secondary-container": "#d8e2ff",
+              "tertiary-fixed": "#e0e6ee",
+              "on-primary-container": "#525252",
+              "on-secondary-fixed-variant": "#0057bd",
+              "on-error-container": "#782232",
+              "secondary-dim": "#004fad",
+              "on-primary-fixed-variant": "#5b5b5b",
+              "error-container": "#ff8b9a",
+              "primary": "#5e5e5e",
+              "background": "#f7f9fb",
+              "primary-container": "#e2e2e2",
+              "tertiary-container": "#e0e6ee",
+              "surface-variant": "#d9e4ea",
+              "error": "#9e3f4e",
+              "primary-fixed-dim": "#d4d4d4",
+              "on-tertiary-fixed-variant": "#585e65",
+              "surface": "#f7f9fb",
+              "secondary": "#005bc4",
+              "inverse-primary": "#ffffff",
+              "tertiary": "#596066",
+              "outline-variant": "#a9b4b9",
+              "on-secondary-container": "#004eaa"
+            },
+            fontFamily: {
+              "headline": ["Inter"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface">
+<!-- SideNavBar (Fixed Left) -->
+<aside class="h-screen w-64 fixed left-0 top-0 z-50 bg-slate-50 dark:bg-slate-900 border-r border-slate-200/50 dark:border-slate-800/50 flex flex-col p-4 gap-y-2 font-['Inter'] font-medium text-[0.875rem]">
+<div class="mb-8 px-2">
+<h1 class="text-xl font-black tracking-tighter text-slate-900 dark:text-slate-50">Linearity</h1>
+<p class="text-xs text-on-surface-variant">AI Workflow</p>
+</div>
+<nav class="space-y-1">
+<a class="flex items-center gap-3 px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm rounded-lg transition-all cursor-pointer" href="#">
+<span class="material-symbols-outlined text-blue-600 dark:text-blue-400">dashboard</span>
+<span>Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-500 dark:text-slate-400 hover:bg-slate-200/50 dark:hover:bg-slate-800/50 rounded-lg transition-all cursor-pointer" href="#">
+<span class="material-symbols-outlined">video_call</span>
+<span>Meetings</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-500 dark:text-slate-400 hover:bg-slate-200/50 dark:hover:bg-slate-800/50 rounded-lg transition-all cursor-pointer" href="#">
+<span class="material-symbols-outlined">smart_toy</span>
+<span>Agents</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-500 dark:text-slate-400 hover:bg-slate-200/50 dark:hover:bg-slate-800/50 rounded-lg transition-all cursor-pointer" href="#">
+<span class="material-symbols-outlined">archive</span>
+<span>Archive</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-500 dark:text-slate-400 hover:bg-slate-200/50 dark:hover:bg-slate-800/50 rounded-lg transition-all cursor-pointer" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span>Settings</span>
+</a>
+</nav>
+<div class="mt-auto pt-4 px-2">
+<div class="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-200/50 dark:hover:bg-slate-800/50 transition-all cursor-pointer">
+<img class="w-8 h-8 rounded-full border border-outline-variant/15" data-alt="User profile avatar" src="https://lh3.googleusercontent.com/aida-public/AB6AXuACCkUvah-bwc0nvQ-MJnGMqgP-K8ZSnZwWte5BN4dIzcUTf50_91lNOmTTgO78eagI4bqQnrkCbtafOaRzfrnhM891jcqgHCSOFhk6awhs_mKiCgux2H3JUY6-FvPT0u9igcmV3CLyQdTmoZVAdDgrOYxzNcSQiN_96H5NvT9ccoVm61JNYKQDNOsRFbaOzCr1VPSJ3zNJGY5Z0aWmYcymwg_7sBHjc0TP1-QTU_ea-yIVag5xf3mdtEAjLp9gHxnYBVJAWXDGZ18"/>
+<div class="overflow-hidden">
+<p class="text-sm font-semibold truncate">Alex Rivera</p>
+<p class="text-[10px] text-on-surface-variant uppercase tracking-wider">Pro Plan</p>
+</div>
+</div>
+</div>
+</aside>
+<!-- Main Content Wrapper -->
+<div class="ml-64 flex flex-col min-h-screen">
+<!-- TopNavBar -->
+<header class="w-full h-16 sticky top-0 z-40 bg-white dark:bg-slate-950 flex items-center justify-between px-6 border-b border-slate-200/50 dark:border-slate-800/50 font-['Inter'] antialiased tracking-tight text-sm shadow-[0_8px_30px_rgba(42,52,57,0.04)]">
+<div class="flex items-center gap-4 flex-1">
+<div class="relative w-full max-w-md group">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors">search</span>
+<input class="w-full bg-surface-container-low border-none rounded-lg pl-10 pr-4 py-2 text-sm focus:ring-2 focus:ring-secondary/20 transition-all placeholder:text-slate-400" placeholder="Search workflows or agents..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors active:scale-95 duration-150 relative">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-2 right-2 w-2 h-2 bg-error rounded-full border-2 border-white dark:border-slate-950"></span>
+</button>
+<button class="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors active:scale-95 duration-150">
+<span class="material-symbols-outlined">account_circle</span>
+</button>
+</div>
+</header>
+<!-- Main Dashboard Canvas -->
+<main class="p-8 space-y-8 flex-1">
+<!-- Dashboard Header -->
+<section class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+<div class="space-y-1">
+<h2 class="text-3xl font-extrabold tracking-tight text-on-surface">Workspace Overview</h2>
+<p class="text-on-surface-variant text-base">Welcome back, Alex. Your agents are currently operating at 98.4% efficiency.</p>
+</div>
+<button class="inline-flex items-center justify-center gap-2 px-6 py-2.5 bg-gradient-to-br from-secondary to-secondary-dim text-white font-semibold rounded-lg shadow-sm hover:opacity-90 active:scale-95 transition-all">
+<span class="material-symbols-outlined text-[20px]">add_circle</span>
+                    New Workflow
+                </button>
+</section>
+<!-- Bento Grid Layout -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+<!-- Left Column: Upcoming Meetings -->
+<div class="lg:col-span-8 space-y-6">
+<div class="bg-surface-container-lowest p-6 rounded-lg shadow-[0_8px_30px_rgba(42,52,57,0.04)]">
+<div class="flex items-center justify-between mb-6">
+<h3 class="font-bold text-lg">Upcoming Meetings</h3>
+<button class="text-secondary text-sm font-medium hover:underline">View Calendar</button>
+</div>
+<div class="space-y-4">
+<!-- Meeting Item -->
+<div class="flex items-center justify-between p-4 bg-surface-container-low rounded-lg group hover:bg-surface-container-high transition-colors">
+<div class="flex items-center gap-4">
+<div class="flex -space-x-2">
+<img class="w-8 h-8 rounded-full border-2 border-white" data-alt="Jane avatar" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBSdhdbuoE_Fg1T2YzgcPlGZ8wy4l6C6ev8eul5ysmA5XTyE67aPIP8VY-8e6XriPzsIRjVpOA9S_rTxar6DEAd2z_jkaXP4aRMAwbSEWIg1zTXO-7jlPs0XUvzsYdk4RXj1tgR9rh0NpxAmGtBf0S2s2XxjFz50pfkim43BXE4qdDosqs-l8_fAMQheBdeXKR6OYrSogytwvLghYJTvltkkR5VutmUwV5Ghxx3fpjgv4BlBNzhQLUC1BVkV6wRepu0Ui5qEMdOuIY"/>
+<img class="w-8 h-8 rounded-full border-2 border-white" data-alt="Mike avatar" src="https://lh3.googleusercontent.com/aida-public/AB6AXuABmSUAhRecPZvl6McL1M6wqzRDUunsXaOdaY0gM9j475rnOijRSRcEWdlgyPNqkGAmOt-Dml0UOU2KHAoO0XCte7jJjw4TICIEwRhzWTiJaYPQijJZRjZfbHEVj3pZSx2TkgHEsA8ZQNUGkDKgL-gC0WBNFV0e488dV5gtcoSPUe2ctAitUHv-MNoKxZyEKs58IUSapJkdtTttt0OQTQ4-Gt8mB_bNwxfAityFYb5904heCJrvHPKx7irSOVb6IkxhrpQh-0z5WUs"/>
+<div class="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold border-2 border-white">+3</div>
+</div>
+<div>
+<h4 class="font-semibold text-slate-900">Product Strategy Sync</h4>
+<p class="text-xs text-on-surface-variant">10:30 AM — 11:15 AM</p>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<span class="px-2.5 py-1 bg-secondary-container text-on-secondary-container text-[10px] font-bold rounded-full tracking-wider uppercase">AI SCRIBE ACTIVE</span>
+<span class="material-symbols-outlined text-slate-400 cursor-pointer hover:text-slate-900 transition-colors">more_vert</span>
+</div>
+</div>
+<!-- Meeting Item -->
+<div class="flex items-center justify-between p-4 bg-surface-container-low rounded-lg group hover:bg-surface-container-high transition-colors">
+<div class="flex items-center gap-4">
+<div class="flex -space-x-2">
+<img class="w-8 h-8 rounded-full border-2 border-white" data-alt="Tech Lead avatar" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAeN9hhbsB-OCaSe5EVL8FzSfxpbtKaaIVksARTmGUee1mM2wO81nLuA1GjKr9uSLiHCeUhvTP_ogkRWLk-PaYIKBgj51u0zFIelCh1B8uCqXN1l6zLgsJBJxvrZ43A0IPunIXrwJcMG3GgGaZ2_13DJ0DTffGRWAyu7tCRJy6HSflOMhFIZx-5TPmdQQgT64F-8i0iBtlywqb1pDYiz_Cs1t7CPH30q0HMSrf_9pwPfY1zLfgHMnThaQI1RH69heljO9VNHD_eFQc"/>
+<img class="w-8 h-8 rounded-full border-2 border-white" data-alt="QA lead avatar" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB5gwaERKyi-0w55XOUkdATg6MPegwSimVxR3MaoEn9Jh4KXMKCB8kjLpNxpW_HkMPXgTTC2w_aYOUfwsujZQcL0rKsuwWm8ZZILO4UC_XVDpS6rCrIyPzBz6mbQ9wpCdmMn8WZcY8xmqlcMiDljvzrSJSmgC2bM7HBOgMDuG-XJ9gdI4A-8ryb9uxCEhXJuO4KaKEfNSWzwDyBE1bXt5jJlSVPAb6cnRdovPNvQu7klIhC2zbzeu4WlaOpqfYsNr3xowJ3DqmvnHA"/>
+</div>
+<div>
+<h4 class="font-semibold text-slate-900">Weekly Engineering Standup</h4>
+<p class="text-xs text-on-surface-variant">02:00 PM — 02:30 PM</p>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<span class="px-2.5 py-1 bg-surface-container-highest text-on-tertiary-container text-[10px] font-bold rounded-full tracking-wider uppercase">READY</span>
+<span class="material-symbols-outlined text-slate-400 cursor-pointer hover:text-slate-900 transition-colors">more_vert</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Agent Performance Section -->
+<div class="bg-surface-container-lowest p-6 rounded-lg shadow-[0_8px_30px_rgba(42,52,57,0.04)]">
+<div class="flex items-center justify-between mb-6">
+<h3 class="font-bold text-lg text-on-surface">Agent Performance</h3>
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer">filter_list</span>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="text-on-surface-variant text-[11px] font-bold uppercase tracking-widest">
+<th class="pb-4 pl-2 font-medium">Agent Entity</th>
+<th class="pb-4 font-medium">Actions Performed</th>
+<th class="pb-4 font-medium">Efficiency</th>
+<th class="pb-4 text-right pr-2 font-medium">Status</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant/10">
+<tr class="group hover:bg-surface-container-low transition-colors">
+<td class="py-4 pl-2">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 bg-blue-100 rounded flex items-center justify-center">
+<span class="material-symbols-outlined text-blue-600 text-sm" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+</div>
+<span class="font-semibold text-slate-900">Agent Alpha</span>
+</div>
+</td>
+<td class="py-4 font-mono text-sm">124 actions</td>
+<td class="py-4">
+<div class="flex items-center gap-2">
+<div class="w-16 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+<div class="h-full bg-secondary w-[98%]" data-alt="Performance progress bar"></div>
+</div>
+<span class="text-xs font-bold">98.4%</span>
+</div>
+</td>
+<td class="py-4 text-right pr-2">
+<span class="px-2 py-0.5 bg-secondary-container text-on-secondary-container text-[10px] font-bold rounded tracking-tight">EXCELLENT</span>
+</td>
+</tr>
+<tr class="group hover:bg-surface-container-low transition-colors">
+<td class="py-4 pl-2">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 bg-purple-100 rounded flex items-center justify-center">
+<span class="material-symbols-outlined text-purple-600 text-sm" style="font-variation-settings: 'FILL' 1;">bolt</span>
+</div>
+<span class="font-semibold text-slate-900">Agent Beta</span>
+</div>
+</td>
+<td class="py-4 font-mono text-sm">86 actions</td>
+<td class="py-4">
+<div class="flex items-center gap-2">
+<div class="w-16 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+<div class="h-full bg-secondary w-[94%]" data-alt="Performance progress bar"></div>
+</div>
+<span class="text-xs font-bold">94.1%</span>
+</div>
+</td>
+<td class="py-4 text-right pr-2">
+<span class="px-2 py-0.5 bg-surface-container text-slate-600 text-[10px] font-bold rounded tracking-tight">OPTIMAL</span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<!-- Right Column: System Alerts -->
+<div class="lg:col-span-4 space-y-6">
+<div class="bg-surface-container-lowest p-6 rounded-lg shadow-[0_8px_30px_rgba(42,52,57,0.04)]">
+<h3 class="font-bold text-lg mb-6">System Health</h3>
+<div class="space-y-4">
+<!-- Alert Item -->
+<div class="p-4 rounded-lg bg-red-50 border-l-4 border-red-500 flex gap-4">
+<span class="material-symbols-outlined text-red-500">warning</span>
+<div>
+<h4 class="text-sm font-bold text-red-900">Storage Critical</h4>
+<p class="text-xs text-red-700 mt-1">Workspace 'Project Graphite' is at 94% capacity. Immediate upgrade required.</p>
+<button class="mt-2 text-xs font-bold text-red-900 hover:underline">Clear Storage</button>
+</div>
+</div>
+<!-- Alert Item -->
+<div class="p-4 rounded-lg bg-orange-50 border-l-4 border-orange-500 flex gap-4">
+<span class="material-symbols-outlined text-orange-500">pending_actions</span>
+<div>
+<h4 class="text-sm font-bold text-orange-900">Action Required</h4>
+<p class="text-xs text-orange-700 mt-1">Agent Alpha requires manual credential refresh for 'Slack API'.</p>
+<button class="mt-2 text-xs font-bold text-orange-900 hover:underline">Authorize Now</button>
+</div>
+</div>
+<!-- Alert Item -->
+<div class="p-4 rounded-lg bg-blue-50 border-l-4 border-blue-500 flex gap-4">
+<span class="material-symbols-outlined text-blue-500">info</span>
+<div>
+<h4 class="text-sm font-bold text-blue-900">System Update</h4>
+<p class="text-xs text-blue-700 mt-1">Core V2.4 is now available. Review release notes for new AI model features.</p>
+<button class="mt-2 text-xs font-bold text-blue-900 hover:underline">View Notes</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Usage Stats (Simplified) -->
+<div class="bg-surface-container-lowest p-6 rounded-lg shadow-[0_8px_30px_rgba(42,52,57,0.04)]">
+<h3 class="font-bold text-sm text-on-surface-variant uppercase tracking-widest mb-4">API Throughput</h3>
+<div class="h-32 flex items-end justify-between gap-1">
+<div class="w-full bg-secondary/10 rounded-t h-[40%]"></div>
+<div class="w-full bg-secondary/20 rounded-t h-[60%]"></div>
+<div class="w-full bg-secondary/30 rounded-t h-[30%]"></div>
+<div class="w-full bg-secondary/40 rounded-t h-[80%]"></div>
+<div class="w-full bg-secondary/50 rounded-t h-[55%]"></div>
+<div class="w-full bg-secondary/60 rounded-t h-[70%]"></div>
+<div class="w-full bg-secondary rounded-t h-[90%]" data-alt="Active api usage bar chart"></div>
+</div>
+<p class="text-[10px] text-center text-on-surface-variant mt-4">Real-time requests per second (Last 24h)</p>
+</div>
+</div>
+</div>
+<!-- Bottom Section: AI Insight -->
+<section class="bg-on-background p-8 rounded-lg text-white flex flex-col md:flex-row items-center justify-between gap-8">
+<div class="space-y-3 max-w-2xl">
+<div class="flex items-center gap-2 text-secondary-fixed">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">auto_awesome</span>
+<span class="text-xs font-bold tracking-widest uppercase">AI Insight of the Week</span>
+</div>
+<h3 class="text-2xl font-bold">Your Engineering standups could be 15% shorter by automating the 'Task Assignment' phase.</h3>
+<p class="text-slate-400 text-sm leading-relaxed">Our analysis shows Agent Beta can handle the Jira ticket creation during the live call, removing the need for post-meeting manual entry.</p>
+</div>
+<button class="whitespace-nowrap px-8 py-3 bg-white text-slate-900 font-bold rounded-lg shadow-xl hover:bg-slate-100 transition-all active:scale-95">
+                    Optimize Workflow
+                </button>
+</section>
+</main>
+</div>
+</body></html>
