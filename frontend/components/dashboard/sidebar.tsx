@@ -18,13 +18,15 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { createClient } from "@/lib/supabase/client";
+import { useState, useEffect } from "react";
 
 const NAV_ITEMS = [
   { label: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
   { label: "Meetings", icon: Mic, href: "/dashboard/meetings" },
   { label: "Tasks", icon: CheckSquare, href: "/dashboard/tasks" },
   { label: "Agents", icon: Bot, href: "/dashboard/agents" },
-  { label: "Approvals", icon: Bell, href: "/dashboard/approvals", badge: "3" },
+  { label: "Approvals", icon: Bell, href: "/dashboard/approvals" }, // badge added dynamically later
   { label: "Activity Log", icon: Activity, href: "/dashboard/activity" },
   { label: "Integrations", icon: Plug, href: "/dashboard/integrations" },
 ];
@@ -36,6 +38,36 @@ const WORKSPACE_ITEMS = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const [pendingApprovals, setPendingApprovals] = useState(0);
+  const [monthlyUsage, setMonthlyUsage] = useState({ used: 0, limit: 50 });
+
+  useEffect(() => {
+    async function fetchData() {
+      const supabase = createClient();
+      
+      // 1. Fetch Pendings
+      const { count: approvalsCount } = await supabase
+        .from('approvals')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'pending');
+      if (approvalsCount !== null) setPendingApprovals(approvalsCount);
+
+      // 2. Fetch Monthly Usage (Meetings in current month)
+      const startOfMonth = new Date();
+      startOfMonth.setDate(1);
+      startOfMonth.setHours(0, 0, 0, 0);
+
+      const { count: meetingsCount } = await supabase
+        .from('meetings')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', startOfMonth.toISOString());
+      
+      if (meetingsCount !== null) {
+        setMonthlyUsage(prev => ({ ...prev, used: meetingsCount }));
+      }
+    }
+    fetchData();
+  }, []);
 
   return (
     <aside className="fixed top-0 left-0 w-[240px] h-screen bg-white border-r border-border-dash pt-16 z-40 flex flex-col">
@@ -75,9 +107,9 @@ export function Sidebar() {
                   isActive ? "text-blue" : "text-slate-400 group-hover:text-slate-600"
                 )} />
                 {item.label}
-                {item.badge && (
+                {item.label === "Approvals" && pendingApprovals > 0 && (
                   <span className="ml-auto bg-orange text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
-                    {item.badge}
+                    {pendingApprovals}
                   </span>
                 )}
               </Link>
@@ -127,12 +159,15 @@ export function Sidebar() {
         <div className="space-y-1.5">
           <div className="flex justify-between items-center text-[11px] font-bold text-slate-400 uppercase tracking-wider">
             <span>Monthly Usage</span>
-            <span>46%</span>
+            <span>{Math.round((monthlyUsage.used / monthlyUsage.limit) * 100)}%</span>
           </div>
           <div className="h-1 w-full bg-slate-100 rounded-full overflow-hidden">
-            <div className="h-full bg-blue rounded-full" style={{ width: "46%" }} />
+            <div 
+              className="h-full bg-blue rounded-full transition-all duration-1000" 
+              style={{ width: `${Math.min(100, (monthlyUsage.used / monthlyUsage.limit) * 100)}%` }} 
+            />
           </div>
-          <p className="text-[11px] text-muted-text">23 of 50 meetings used</p>
+          <p className="text-[11px] text-muted-text">{monthlyUsage.used} of {monthlyUsage.limit} meetings used</p>
         </div>
       </div>
     </aside>

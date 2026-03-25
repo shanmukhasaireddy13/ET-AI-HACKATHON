@@ -2,22 +2,57 @@
 
 import { CheckCircle2, XCircle, Clock, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useState, useEffect } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { format } from "date-fns";
 
-const APPROVALS = [
-  { id: "a1", date: "Mar 21, 10:45", action: "Create 14 Jira tickets for Meeting v102", priority: "High", decision: "Approved", decider: "Rahul Sharma", time: "12m" },
-  { id: "a2", date: "Mar 20, 16:30", action: "Update stakeholder list from context", priority: "Critical", decision: "Approved", decider: "Priya Singh", time: "2h 45m" },
-  { id: "a3", date: "Mar 20, 14:12", action: "Auto-archive older engineering logs", priority: "Medium", decision: "Rejected", decider: "System", time: "0s (Auto)" },
-  { id: "a4", date: "Mar 19, 09:20", action: "Push newsletter draft to Slack", priority: "High", decision: "Approved", decider: "John Doe", time: "1.5h" },
-];
 
-export function ApprovalsTab() {
+
+export function ApprovalsTab({ agentName }: { agentName: string }) {
+  const [data, setData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({ total: 0, approved: 0, rejected: 0 });
+
+  useEffect(() => {
+    async function fetchAgentApprovals() {
+      const supabase = createClient();
+      const { data: approvals, error } = await supabase
+        .from('approvals')
+        .select('*')
+        .eq('source_agent', agentName)
+        .order('created_at', { ascending: false });
+
+      if (!error && approvals) {
+        const formatted = approvals.map((a: any) => ({
+          id: a.id,
+          date: format(new Date(a.created_at), 'MMM dd, HH:mm'),
+          action: `Execute ${a.tool_name}`,
+          priority: a.priority || "Medium",
+          decision: a.status.charAt(0).toUpperCase() + a.status.slice(1),
+          decider: "You",
+          time: "12m"
+        }));
+        setData(formatted);
+        setStats({
+          total: approvals.length,
+          approved: approvals.filter((a: any) => a.status === 'approved').length,
+          rejected: approvals.filter((a: any) => a.status === 'rejected').length
+        });
+      }
+      setLoading(false);
+    }
+    fetchAgentApprovals();
+  }, [agentName]);
+
+  if (loading) return <div className="py-10 text-center animate-pulse text-slate-400">Loading history...</div>;
+
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
       <div className="grid grid-cols-3 gap-3 mb-6">
         {[
-          { label: "Total Reviewed", value: "34", icon: <CheckCircle2 className="w-3.5 h-3.5" />, color: "text-blue", bg: "bg-blue-light" },
-          { label: "Approved", value: "31", icon: <CheckCircle2 className="w-3.5 h-3.5" />, color: "text-success", bg: "bg-success-bg" },
-          { label: "Rejected", value: "3", icon: <XCircle className="w-3.5 h-3.5" />, color: "text-error", bg: "bg-error-bg" }
+          { label: "Total Reviewed", value: stats.total.toString(), icon: <CheckCircle2 className="w-3.5 h-3.5" />, color: "text-blue", bg: "bg-blue-light" },
+          { label: "Approved", value: stats.approved.toString(), icon: <CheckCircle2 className="w-3.5 h-3.5" />, color: "text-success", bg: "bg-success-bg" },
+          { label: "Rejected", value: stats.rejected.toString(), icon: <XCircle className="w-3.5 h-3.5" />, color: "text-error", bg: "bg-error-bg" }
         ].map((s, i) => (
           <div key={i} className="bg-white border border-slate-200 rounded-lg p-3 px-4 flex items-center gap-3 shadow-sm">
              <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center", s.bg, s.color)}>
@@ -44,7 +79,7 @@ export function ApprovalsTab() {
             </tr>
           </thead>
           <tbody>
-            {APPROVALS.map((a) => (
+            {data.length > 0 ? data.map((a) => (
               <tr key={a.id} className="h-12 border-b border-slate-50 hover:bg-slate-50/20 transition-colors group">
                 <td className="pl-5 text-[12px] font-semibold text-slate-500">{a.date}</td>
                 <td className="text-[13px] font-bold text-slate-800 pr-4">
@@ -73,7 +108,11 @@ export function ApprovalsTab() {
                 <td className="text-[12px] font-bold text-slate-600">{a.decider}</td>
                 <td className="text-right pr-6 text-[12px] font-mono text-slate-400">{a.time}</td>
               </tr>
-            ))}
+            )) : (
+              <tr>
+                <td colSpan={6} className="py-10 text-center text-slate-400 text-sm">No approval history available.</td>
+              </tr>
+            )}
           </tbody>
         </table>
         <div className="p-4 bg-slate-50/30 flex justify-center border-t border-slate-50">

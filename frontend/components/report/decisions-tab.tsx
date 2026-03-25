@@ -5,42 +5,22 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
-const DECISIONS = [
-  {
-    id: 1,
-    priority: "Critical",
-    confidence: 94,
-    text: "Adopt micro-services architecture for the new billing module to improve scalability and fault tolerance.",
-    decidedBy: "Rahul, Priya",
-    timestamp: "32:14",
-    status: "pending"
-  },
-  {
-    id: 2,
-    priority: "High",
-    confidence: 88,
-    text: "Deprecate the legacy V1 API by the end of Q2 and transition all internal services to the GraphQL gateway.",
-    decidedBy: "John Doe",
-    timestamp: "14:05",
-    status: "reviewed"
-  },
-  {
-    id: 3,
-    priority: "Normal",
-    confidence: 92,
-    text: "Implement a standardized logging format across all backend services using OpenTelemetry.",
-    decidedBy: "Sarah, Mike",
-    timestamp: "45:22",
-    status: "pending"
-  }
-];
+export function DecisionsTab({ decisions = [] }: { decisions: any[] }) {
+  const displayDecisions = decisions.length > 0 ? decisions.map(d => ({
+    id: d.id,
+    priority: d.priority || "Normal",
+    confidence: d.confidence || 90,
+    text: d.text || "Decision text missing",
+    decidedBy: "Stakeholders",
+    timestamp: d.timestamp || new Date(d.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    status: "extracted"
+  })) : [];
 
-export function DecisionsTab() {
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
       <div className="flex items-center justify-between mb-4">
         <p className="text-[13px] text-muted-text">
-          <span className="font-bold text-[#0F172A]">{DECISIONS.length}</span> decisions extracted
+          <span className="font-bold text-[#0F172A]">{displayDecisions.length}</span> decisions extracted
         </p>
         <div className="flex items-center gap-1.5 p-1 bg-dash-bg rounded-full border border-border-dash">
           {["All", "Critical", "High", "Normal"].map((filter, i) => (
@@ -56,9 +36,9 @@ export function DecisionsTab() {
           ))}
         </div>
       </div>
-
+ 
       <div className="flex flex-col gap-3">
-        {DECISIONS.map((decision) => (
+        {displayDecisions.map((decision) => (
           <div 
             key={decision.id} 
             className={cn(

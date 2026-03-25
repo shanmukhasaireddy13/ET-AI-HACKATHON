@@ -10,106 +10,154 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 
-const AGENT_NODES = [
-  { id: "1", name: "Transcript Parser Agent", type: "Parser", duration: "12.3s", status: "Complete", icon: FileText, input: "4,200 word transcript from Engineering Planning meeting", output: "Parsed 4 main speakers, 76 speech segments." },
-  { id: "2", name: "Decision Extractor Agent", type: "Analyzer", duration: "15.8s", status: "Complete", icon: Brain, input: "76 speech segments", output: "Extracted 6 decisions with >85% confidence." },
-  { id: "3", name: "Task Generator Agent", type: "Generator", duration: "10.1s", status: "Complete", icon: ListChecks, input: "6 extracted decisions and 42 identified action phrases", output: "Created 14 tasks with priority labels." },
-  { id: "4", name: "Assignment Agent", type: "Logic", duration: "8.4s", status: "Complete", icon: UserCheck, input: "14 tasks and meeting participant context", output: "Assigned 11 tasks based on speaker expertise.", needsApproval: true, approvedBy: "John Doe" },
-  { id: "5", name: "Jira Integration Agent", type: "Connector", duration: "11.8s", status: "Running", icon: Link, input: "14 tasks with assignments", output: "Syncing status: 8 of 14 tickets created..." },
-];
+export function AgentRunTab({ reasoning = [], trace = [] }: { reasoning: any[], trace: any[] }) {
+  const agentNodes = reasoning.length > 0 ? reasoning.map((r, i) => ({
+    id: r.id || `reason-${i}`,
+    name: r.agent_name || "Unknown Agent",
+    type: "Reasoning Node",
+    duration: "N/A",
+    status: "Complete",
+    icon: r.agent_name?.toLowerCase().includes("planner") ? ListChecks : Brain,
+    input: "Meeting Transcript",
+    output: r.reasoning || "",
+    logs: r.context_data || []
+  })) : [];
 
-export function AgentRunTab() {
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
-      <div className="flex items-center justify-between">
-        <p className="text-[13px] text-muted-text">
-          This meeting was processed by <span className="font-bold text-[#0F172A]">5 agents</span> in <span className="font-bold text-[#0F172A]">58 seconds</span> total.
-        </p>
-      </div>
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
+      {/* 1. Strategic Reasoning Section */}
+      <section className="space-y-4">
+        <div className="flex items-center gap-2">
+          <Brain className="w-5 h-5 text-blue" />
+          <h3 className="text-[16px] font-bold text-[#0F172A]">Strategic Reasoning</h3>
+        </div>
+        
+        <div className="relative pl-10 space-y-3">
+          <div className="absolute left-[19px] top-4 bottom-4 w-0.5 bg-slate-100" />
+          <Accordion className="space-y-3">
+            {agentNodes.map((agent: any) => (
+              <div key={agent.id} className="relative">
+                <div className="absolute -left-10 top-0 w-[40px] h-[40px] rounded-full border-2 bg-white border-slate-200 text-slate-400 flex items-center justify-center z-10 transition-all">
+                  <agent.icon className="w-4 h-4" />
+                </div>
 
-      <div className="relative pl-10 space-y-3">
-        {/* Central vertical line */}
-        <div className="absolute left-[19px] top-4 bottom-4 w-0.5 bg-slate-100" />
-        <div className="absolute left-[19px] top-4 h-[75%] w-0.5 bg-blue" />
-
-        <Accordion className="space-y-3">
-          {AGENT_NODES.map((agent, i) => (
-            <div key={agent.id} className="relative">
-              {/* Timeline Dot */}
-              <div className={cn(
-                "absolute -left-10 top-0 w-[40px] h-[40px] rounded-full border-2 flex items-center justify-center z-10 transition-all",
-                agent.status === "Complete" ? "bg-success-bg border-success-border text-success" :
-                agent.status === "Running" ? "bg-warning-bg border-warning-border text-warning ring-4 ring-warning/5" :
-                "bg-slate-50 border-slate-200 text-slate-400"
-              )}>
-                <agent.icon className={cn("w-4 h-4", agent.status === "Running" && "animate-pulse")} />
+                <AccordionItem value={agent.id} className="border border-border-dash rounded-[10px] bg-white overflow-hidden px-0">
+                  <AccordionTrigger className="hover:no-underline px-5 py-3.5">
+                    <div className="flex-1 flex items-center justify-between text-left">
+                      <div className="flex items-center gap-3">
+                        <span className="text-[14px] font-bold text-[#0F172A]">{agent.name}</span>
+                        <Badge variant="secondary" className="text-[10px] font-bold uppercase tracking-widest">{agent.type}</Badge>
+                      </div>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="px-5 pb-5 pt-0 border-t border-slate-50">
+                    <div className="pt-4 text-[13px] text-body leading-relaxed whitespace-pre-wrap">
+                      {agent.output}
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
               </div>
+            ))}
+          </Accordion>
+        </div>
+      </section>
 
-              <AccordionItem value={agent.id} className="border border-border-dash rounded-[10px] bg-white overflow-hidden data-[state=open]:shadow-md transition-all px-0">
-                <AccordionTrigger className="hover:no-underline px-5 py-3.5 group">
-                  <div className="flex-1 flex items-center justify-between text-left">
-                    <div className="flex items-center gap-3">
-                      <span className="text-[14px] font-bold text-[#0F172A]">{agent.name}</span>
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-50 px-1.5 py-0.5 rounded">{agent.type}</span>
-                    </div>
-                    <div className="flex items-center gap-6 mr-4">
-                      <span className="text-[12px] font-mono text-slate-400 font-medium">{agent.duration}</span>
-                      <Badge variant="outline" className={cn(
-                        "rounded-full px-2.5 py-0.5 text-[10px] font-bold border",
-                        agent.status === "Complete" ? "bg-success-bg text-success border-success-border" :
-                        "bg-warning-bg text-warning border-warning-border"
-                      )}>
-                        {agent.status}
-                      </Badge>
-                    </div>
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent className="px-5 pb-5 pt-0 border-t border-slate-50">
-                  <div className="space-y-4 pt-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Input</h4>
-                        <p className="text-[12.5px] text-body bg-dash-bg/50 p-2.5 rounded-lg border border-slate-100">{agent.input}</p>
-                      </div>
-                      <div>
-                        <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Output</h4>
-                        <p className="text-[12.5px] text-body bg-dash-bg/50 p-2.5 rounded-lg border border-slate-100">{agent.output}</p>
-                      </div>
-                    </div>
+      {/* 2. Technical Execution Trace (The "Queue") */}
+      <section className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Link className="w-5 h-5 text-success" />
+            <h3 className="text-[16px] font-bold text-[#0F172A]">Technical Execution Trace</h3>
+          </div>
+          <Badge className="bg-success-bg text-success border-success-border font-bold">100% Agentic Flow</Badge>
+        </div>
 
-                    {agent.needsApproval && (
-                      <div className="bg-warning-bg/50 border border-warning-border p-3 rounded-lg flex items-start gap-3">
-                        <ShieldAlert className="w-4 h-4 text-warning mt-0.5" />
-                        <div>
-                          <p className="text-[13px] font-bold text-warning">Required your approval</p>
-                          <p className="text-[12px] text-slate-500 mt-0.5">Approved by <span className="font-semibold text-slate-600">{agent.approvedBy}</span> · 10:47 AM, Mar 21</p>
-                        </div>
-                      </div>
-                    )}
-
+        {trace.length === 0 ? (
+          <div className="bg-slate-50 border border-dashed rounded-xl p-8 text-center">
+            <p className="text-[13px] text-slate-500">No technical execution steps recorded yet.</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {trace.map((step, idx) => (
+              <div key={step.id} className={cn(
+                "border rounded-xl p-4 transition-all shadow-sm",
+                step.status === 'failed' ? "bg-red-50/50 border-red-100" : 
+                step.criticality >= 7 ? "bg-orange-50/50 border-orange-100" :
+                "bg-white border-border-dash"
+              )}>
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className={cn(
+                      "w-8 h-8 rounded-lg flex items-center justify-center font-mono text-[12px] font-bold",
+                      step.status === 'completed' ? "bg-success-bg text-success" : 
+                      step.status === 'failed' ? "bg-red-100 text-red-600" : "bg-blue-50 text-blue"
+                    )}>
+                      {idx + 1}
+                    </div>
                     <div>
-                      <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Agent Logs</h4>
-                      <div className="bg-[#0F172A] text-slate-300 p-4 rounded-lg font-mono text-[11px] leading-relaxed shadow-inner">
-                        <p className="text-slate-500">[{new Date().toLocaleTimeString()}] Initializing {agent.name}...</p>
-                        <p className="text-blue-400">[{new Date().toLocaleTimeString()}] Fetching context from vector store...</p>
-                        <p className="text-success">[{new Date().toLocaleTimeString()}] Processing 4,218 words.</p>
-                        <p className="text-white">[{new Date().toLocaleTimeString()}] {agent.output}</p>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-[14px] font-bold text-[#0F172A]">{step.tool_name || step.agent_role}</h4>
+                        {step.criticality >= 7 && (
+                          <Badge className="bg-orange-100 text-orange-700 border-orange-200 text-[10px]">High Risk: {step.criticality}/10</Badge>
+                        )}
                       </div>
-                      <button className="text-[11px] font-bold text-blue hover:underline mt-2">View full log →</button>
+                      <p className="text-[11px] text-slate-400 font-medium">
+                        {new Date(step.created_at).toLocaleTimeString()}
+                      </p>
                     </div>
                   </div>
-                </AccordionContent>
-              </AccordionItem>
-            </div>
-          ))}
-        </Accordion>
-      </div>
+                  <Badge variant="outline" className={cn(
+                    "capitalize text-[10px] font-bold",
+                    step.status === 'completed' ? "border-green-200 text-green-700 bg-green-50" :
+                    step.status === 'failed' ? "border-red-200 text-red-700 bg-red-50" :
+                    "border-blue-200 text-blue-700 bg-blue-50"
+                  )}>
+                    {step.status}
+                  </Badge>
+                </div>
 
-      <div className="pt-6 border-t border-slate-100 pl-10">
-        <p className="text-[12px] text-muted-text">
-          Total analysis time: <span className="font-mono font-bold text-slate-600">58.4s</span>
-          <span className="mx-2 text-slate-300">•</span>
-          Completed at: <span className="font-semibold text-slate-600">10:47 AM, Sat 21 Mar 2026</span>
+                <div className="space-y-3">
+                  {step.thought && (
+                    <div className="bg-slate-50 rounded-lg p-3">
+                      <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1.5">
+                        <Brain className="w-3 h-3" /> Agent Thought
+                      </h5>
+                      <p className="text-[12.5px] text-slate-700 italic">"{step.thought}"</p>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="bg-slate-900 rounded-lg p-3 font-mono">
+                      <h5 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Execution / Tool Call</h5>
+                      <pre className="text-[11px] text-blue-400 overflow-x-auto whitespace-pre-wrap">
+                        {typeof step.tool_args === 'object' ? JSON.stringify(step.tool_args, null, 2) : step.tool_args}
+                      </pre>
+                    </div>
+                    <div className="bg-slate-50 rounded-lg p-3 border border-slate-100">
+                      <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Result</h5>
+                      <div className="text-[11px] text-slate-600 max-h-[100px] overflow-y-auto">
+                        {typeof step.result === 'object' ? JSON.stringify(step.result, null, 2) : step.result}
+                      </div>
+                    </div>
+                  </div>
+
+                  {step.criticality >= 7 && (
+                    <div className="flex items-center gap-2 text-[12px] font-bold text-orange-600 bg-orange-50 p-2 rounded-lg border border-orange-100">
+                      <ShieldAlert className="w-4 h-4" />
+                      Human-in-the-loop Gate: {["success", "approved", "completed"].includes(step.status) ? "Approved" : "Waiting for Decision"}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <div className="pt-6 border-t border-slate-100">
+        <p className="text-[12px] text-muted-text flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-success" />
+          System verified: 100% Agentic Workflow powered by SIDD Brain.
         </p>
       </div>
     </div>

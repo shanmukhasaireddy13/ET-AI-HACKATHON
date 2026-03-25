@@ -16,11 +16,18 @@ export function Step1Transcript({ onNext }: Step1Props) {
   const [text, setText] = useState("");
   const [isDragging, setIsDragging] = useState(false);
 
+  const handleFile = (f: File) => {
+    setFile(f);
+    const reader = new FileReader();
+    reader.onload = (e) => setText(e.target?.result as string);
+    reader.readAsText(f);
+  };
+
   const handleFileDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
     if (e.dataTransfer.files?.[0]) {
-      setFile(e.dataTransfer.files[0]);
+      handleFile(e.dataTransfer.files[0]);
     }
   };
 
@@ -57,11 +64,19 @@ export function Step1Transcript({ onNext }: Step1Props) {
               onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
               onDragLeave={() => setIsDragging(false)}
               onDrop={handleFileDrop}
+              onClick={() => document.getElementById('file-upload')?.click()}
               className={cn(
                 "border-2 border-dashed rounded-[10px] p-[48px_32px] text-center cursor-pointer transition-all",
                 isDragging ? "border-[#2563EB] bg-[#EFF6FF]" : "border-[#E2E8F0] bg-[#F8FAFC]"
               )}
              >
+                <input 
+                  id="file-upload"
+                  type="file" 
+                  className="hidden" 
+                  accept=".txt,.pdf,.docx,.vtt,.srt"
+                  onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
+                />
                 <div className="flex flex-col items-center">
                    <Upload className="w-8 h-8 text-[#94A3B8]" />
                    <p className="text-[14px] font-medium text-[#334155] mt-3">Drop your transcript here</p>
@@ -101,7 +116,7 @@ export function Step1Transcript({ onNext }: Step1Props) {
       {/* Footer */}
       <div className="flex justify-end mt-6">
          <Button 
-          onClick={() => onNext({ type: activeTab, content: file || text })}
+          onClick={() => onNext({ type: activeTab, transcript: text })}
           disabled={!file && !text.trim()}
           className="h-10 px-6 bg-[#2563EB] hover:bg-blue-600 text-white rounded-lg font-bold text-[13px]"
          >

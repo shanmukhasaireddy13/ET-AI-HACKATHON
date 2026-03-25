@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { createClient } from "@/lib/supabase/client";
 import { TaskHeader } from "@/components/tasks/task-header";
 import { TaskFilters, TaskView } from "@/components/tasks/task-filters";
 import { KanbanBoard } from "@/components/tasks/kanban-board";
@@ -8,9 +9,10 @@ import { TaskTable } from "@/components/tasks/task-table";
 import { TaskCalendar } from "@/components/tasks/task-calendar";
 import { AddTaskModal } from "@/components/tasks/add-task-modal";
 import { TaskDrawer } from "@/components/report/task-drawer";
-import { CheckSquare } from "lucide-react";
 
 export default function TasksPage() {
+  const [tasks, setTasks] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [activeView, setActiveView] = useState<TaskView>("kanban");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -22,6 +24,36 @@ export default function TasksPage() {
     meeting: "",
     status: "",
   });
+
+  const supabase = createClient();
+
+  useEffect(() => {
+    async function fetchTasks() {
+      const { data, error } = await supabase
+        .from('tasks')
+        .select('*, meetings(title)')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error("Error fetching tasks:", error);
+      } else {
+        const formatted = data.map((t: any) => ({
+          id: t.id,
+          title: t.title,
+          priority: t.priority || "Medium",
+          status: (t.status || "todo").toLowerCase().replace(" ", ""),
+          source: t.meetings?.title || "Direct Task",
+          assignee: { name: t.assignee || "Unassigned" },
+          dueDate: t.due_date ? new Date(t.due_date).toLocaleDateString() : "TBD",
+          isOverdue: t.due_date ? new Date(t.due_date) < new Date() && t.status !== "Done" : false
+        }));
+        setTasks(formatted);
+      }
+      setLoading(false);
+    }
+
+    fetchTasks();
+  }, []);
 
   const handleFilterChange = (key: string, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }));
@@ -42,11 +74,10 @@ export default function TasksPage() {
     setIsDrawerOpen(true);
   };
 
-  // Mock total counts
   const stats = {
-    total: 47,
-    inProgress: 12,
-    overdue: 3
+    total: tasks.length,
+    inProgress: tasks.filter(t => t.status === 'inprogress').length,
+    overdue: tasks.filter(t => t.isOverdue).length
   };
 
   return (
@@ -72,22 +103,24 @@ export default function TasksPage() {
 
         {/* Main View Content */}
         <div className="animate-in slide-in-from-bottom-2 duration-500">
-          {activeView === "kanban" && (
-             <div onClick={() => handleTaskClick({ title: "Mock Kanban Task", status: "In Progress", priority: "High", assignee: "David Wu", due: "Mar 22" })}>
-               <KanbanBoard />
+          {loading ? (
+             <div className="flex justify-center py-20">
+               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue"></div>
              </div>
-          )}
-          
-          {activeView === "table" && (
-            <div onClick={() => handleTaskClick({ title: "Table Task Detail", status: "Done", priority: "Medium", assignee: "David Wu", due: "Mar 20" })}>
-              <TaskTable />
-            </div>
-          )}
+          ) : (
+            <>
+              {activeView === "kanban" && (
+                <KanbanBoard tasks={tasks} />
+              )}
+              
+              {activeView === "table" && (
+                <TaskTable tasks={tasks} />
+              )}
 
-          {activeView === "calendar" && (
-            <div onClick={() => handleTaskClick({ title: "Calendar Task Detail", status: "To Do", priority: "Low", assignee: "Priya Singh", due: "Mar 24" })}>
-               <TaskCalendar />
-            </div>
+              {activeView === "calendar" && (
+                <TaskCalendar tasks={tasks} />
+              )}
+            </>
           )}
         </div>
       </div>

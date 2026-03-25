@@ -2,13 +2,7 @@
 
 import { Bot } from "lucide-react";
 
-export function AgentStatsStrip() {
-  const stats = [
-    { label: "Total Agents", value: "7", icon: <Bot className="w-4 h-4 text-blue" />, bg: "bg-blue-light" },
-    { label: "Active", value: "5", color: "text-success", dot: "bg-success" },
-    { label: "Running", value: "1", color: "text-warning", dot: "bg-warning", pulse: true },
-    { label: "Idle", value: "1", color: "text-slate-500", dot: "bg-slate-300" },
-  ];
+export function AgentStatsStrip({ stats }: { stats: any[] }) {
 
   return (
     <div className="grid grid-cols-4 gap-3 mb-6">

@@ -1,73 +1,98 @@
-"use client";
-
 import { Bot, CheckSquare, ShieldAlert, Mic, AlertCircle, Plug, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { formatDistanceToNow } from "date-fns";
 
-const ACTIVITIES = [
-  {
-    id: 1,
-    type: "agent",
-    actor: "Task Generator Agent",
-    description: "created 12 tasks from Engineering Planning meeting",
-    time: "2 min ago",
-    icon: Bot,
-    bg: "bg-blue-light",
-    color: "text-blue"
-  },
-  {
-    id: 2,
-    type: "user",
-    actor: "You",
-    description: "approved Jira epic creation — PROJ-204",
-    time: "15 min ago",
-    icon: ShieldAlert,
-    bg: "bg-orange-light",
-    color: "text-orange"
-  },
-  {
-    id: 3,
-    type: "agent",
-    actor: "Assignment Agent",
-    description: "assigned 4 tasks to Rahul Sharma",
-    time: "45 min ago",
-    icon: CheckSquare,
-    bg: "bg-success-bg",
-    color: "text-success"
-  },
-  {
-    id: 4,
-    type: "meeting",
-    actor: "System",
-    description: "successfully parsed 'Design Sync' transcript",
-    time: "1 hour ago",
-    icon: Mic,
-    bg: "bg-blue-light",
-    color: "text-blue"
-  },
-  {
-    id: 5,
-    type: "error",
-    actor: "Jira Agent",
-    description: "failed to sync tickets — Authentication error",
-    time: "2 hours ago",
-    icon: AlertCircle,
-    bg: "bg-red-light",
-    color: "text-error"
-  },
-  {
-    id: 6,
-    type: "integration",
-    actor: "Slack",
-    description: "connected successfully to #engineering-updates",
-    time: "3 hours ago",
-    icon: Plug,
-    bg: "bg-success-bg",
-    color: "text-success"
-  }
-];
+type ActivityItem = {
+  id: string;
+  type: "meeting" | "task" | "approval" | "agent" | "error";
+  actor: string;
+  description: string;
+  timestamp: string;
+  icon: any;
+  bg: string;
+  color: string;
+};
 
 export function ActivityFeed() {
+  const [activities, setActivities] = useState<ActivityItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const supabase = createClient();
+
+  useEffect(() => {
+    async function fetchActivity() {
+      const { data, error } = await supabase
+        .from('activity_events')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (data) {
+        const mapped: ActivityItem[] = data.map(item => {
+          let icon = Bot;
+          let bg = "bg-slate-100";
+          let color = "text-slate-500";
+
+          switch (item.category) {
+            case 'meeting':
+              icon = Mic;
+              bg = "bg-blue-light";
+              color = "text-blue";
+              break;
+            case 'task':
+              icon = CheckSquare;
+              bg = "bg-success-bg";
+              color = "text-success";
+              break;
+            case 'approval':
+              icon = ShieldAlert;
+              bg = "bg-orange-light";
+              color = "text-orange";
+              break;
+            case 'integration':
+              icon = Plug;
+              bg = "bg-purple-light";
+              color = "text-purple";
+              break;
+          }
+
+          return {
+            id: item.id,
+            type: item.category as any,
+            actor: item.category === 'agent' ? 'SIDD Agent' : 'System',
+            description: item.description || item.action,
+            timestamp: item.created_at,
+            icon: icon,
+            bg: bg,
+            color: color
+          };
+        });
+
+        setActivities(mapped);
+      }
+      setLoading(false);
+    }
+
+    fetchActivity();
+  }, []);
+
+  if (loading) {
+     return (
+       <div className="bg-white border border-border-dash rounded-xl p-12 flex justify-center items-center shadow-sm">
+         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-300"></div>
+       </div>
+     );
+  }
+
+  if (activities.length === 0) {
+    return (
+      <div className="bg-white border border-border-dash rounded-xl p-12 text-center shadow-sm">
+        <p className="text-[13px] text-slate-500">No recent activity found.</p>
+      </div>
+    );
+  }
   return (
     <div className="bg-white border border-border-dash rounded-xl overflow-hidden">
       <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
@@ -91,9 +116,9 @@ export function ActivityFeed() {
       </div>
 
       <div className="divide-y divide-slate-50">
-        {ACTIVITIES.map((item) => (
+        {activities.map((item, idx) => (
           <div key={item.id} className="px-6 py-3.5 flex items-start gap-4 hover:bg-slate-50/50 transition-colors group relative overflow-hidden">
-            {item.id === 1 && <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue" />}
+            {idx === 0 && <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue" />}
             
             <div className={cn("w-8 h-8 rounded-full flex items-center justify-center shrink-0", item.bg)}>
               <item.icon className={cn("w-4 h-4", item.color)} />
@@ -105,7 +130,7 @@ export function ActivityFeed() {
                 {item.description}
               </p>
               <div className="flex items-center gap-2 mt-1">
-                <span className="text-[12px] text-slate-400">{item.time}</span>
+                <span className="text-[12px] text-slate-400">{formatDistanceToNow(new Date(item.timestamp))} ago</span>
                 {item.type === "agent" && <span className="w-1.5 h-1.5 rounded-full bg-success" />}
               </div>
             </div>

@@ -15,15 +15,17 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 
-const TASKS = [
-  { id: "1", title: "Scale out API instances for pricing engine", assignee: "Rahul Sharma", priority: "High", due: "Mar 25", status: "In Progress", jira: "PROJ-102" },
-  { id: "2", title: "Audit security protocols for cross-site sessions", assignee: "Priya Singh", priority: "High", due: "Mar 25", status: "To Do", jira: null },
-  { id: "3", title: "Update README with new microservices map", assignee: "Unassigned", priority: "Normal", due: "Mar 28", status: "To Do", jira: null },
-  { id: "4", title: "Review Q2 budget allocation draft", assignee: "John Doe", priority: "Medium", due: "Today", status: "Blocked", jira: "PROJ-105" },
-  { id: "5", title: "Draft performance benchmark for v3 gateway", assignee: "Sarah Smith", priority: "Normal", due: "Mar 25", status: "Done", jira: "PROJ-110" },
-];
+export function TasksTab({ tasks = [] }: { tasks: any[] }) {
+  const displayTasks = tasks.length > 0 ? tasks.map(t => ({
+    id: t.id,
+    title: t.title,
+    assignee: t.assignee_name || "Unassigned",
+    priority: t.priority || "Normal",
+    due: t.due_date ? new Date(t.due_date).toLocaleDateString() : "TBD",
+    status: t.status || "To Do",
+    jira: t.jira_key || null
+  })) : [];
 
-export function TasksTab() {
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
       {/* Toolbar */}
@@ -77,7 +79,7 @@ export function TasksTab() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {TASKS.map((task) => (
+            {displayTasks.map((task: any) => (
               <TableRow key={task.id} className="h-13 group hover:bg-slate-50/50 border-slate-50 transition-colors cursor-pointer">
                 <TableCell className="text-center">
                   <Checkbox className="rounded-[3px] border-slate-300 w-3.5 h-3.5 group-hover:border-blue transition-colors" />
@@ -92,7 +94,7 @@ export function TasksTab() {
                 <TableCell>
                   <div className="flex items-center gap-2">
                     <div className="w-5 h-5 rounded-full bg-blue-light text-blue flex items-center justify-center font-bold text-[9px] ring-1 ring-white">
-                      {task.assignee === "Unassigned" ? "?" : task.assignee.split(' ').map(n=>n[0]).join('')}
+                      {task.assignee === "Unassigned" ? "?" : task.assignee.split(' ').map((n: string)=>n[0]).join('')}
                     </div>
                     <span className={cn("text-[12.5px]", task.assignee === "Unassigned" ? "text-slate-400 italic" : "text-body font-medium")}>
                       {task.assignee === "Unassigned" ? "Unassigned" : task.assignee}
@@ -158,15 +160,13 @@ export function TasksTab() {
         </Table>
         
         <div className="p-4 border-t border-slate-50 flex items-center justify-between text-[12px] text-muted-text bg-white">
-          <span>Showing 5 of 14 tasks</span>
+          <span>Showing {displayTasks.length} tasks</span>
           <div className="flex items-center gap-2">
             <Button variant="ghost" disabled className="h-8 text-[12px] px-2 hover:bg-slate-100">Prev</Button>
             <div className="flex items-center gap-1">
               <button className="w-7 h-7 flex items-center justify-center rounded bg-blue text-white font-bold">1</button>
-              <button className="w-7 h-7 flex items-center justify-center rounded hover:bg-slate-100 font-medium">2</button>
-              <button className="w-7 h-7 flex items-center justify-center rounded hover:bg-slate-100 font-medium">3</button>
             </div>
-            <Button variant="ghost" className="h-8 text-[12px] px-2 hover:bg-slate-100">Next</Button>
+            <Button variant="ghost" disabled className="h-8 text-[12px] px-2 hover:bg-slate-100">Next</Button>
           </div>
         </div>
       </div>

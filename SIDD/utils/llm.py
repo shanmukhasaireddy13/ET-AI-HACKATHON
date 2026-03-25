@@ -24,6 +24,14 @@ else:
     from groq import Groq
     groq_client = Groq(api_key=config.GROQ_API_KEY)
 
+nvidia_client = None
+if active_provider == "nvidia":
+    from openai import OpenAI
+    nvidia_client = OpenAI(
+        base_url=config.NVIDIA_BASE_URL,
+        api_key=config.NVIDIA_API_KEY
+    )
+
 MAX_RETRIES = 3
 BASE_WAIT = 25  # seconds to wait on rate limit
 
@@ -45,6 +53,19 @@ def call_gemini(prompt: str, expect_json: bool = False):
             if active_provider == "gemini":
                 response = gemini_model.generate_content(prompt)
                 text = response.text.strip()
+            elif active_provider == "nvidia":
+                response = nvidia_client.chat.completions.create(
+                    model=config.NVIDIA_MODEL,
+                    messages=[
+                        {"role": "system", "content": "You are a helpful AI assistant. Always return ONLY valid JSON when requested." if expect_json else "You are a helpful AI assistant."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    temperature=0.1,
+                    # Nvidia doesn't always support response_format={"type": "json_object"} same as Groq/OpenAI, 
+                    # but we can try if the model supports it. Minimax might not.
+                    # response_format={"type": "json_object"} if expect_json else None
+                )
+                text = response.choices[0].message.content.strip()
             else:
                 response = groq_client.chat.completions.create(
                     messages=[

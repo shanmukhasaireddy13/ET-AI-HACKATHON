@@ -2,8 +2,9 @@
 
 import { Sparkles, RefreshCw, Gavel, ListChecks, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
-export function SummaryTab() {
+export function SummaryTab({ summary, stats, keyTopics = [] }: { summary?: string, stats?: { tasks: number, decisions: number, followups: number }, keyTopics?: any[] }) {
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
       {/* AI Summary Card */}
@@ -20,36 +21,51 @@ export function SummaryTab() {
         </div>
         
         <p className="text-[15px] text-[#334155] leading-[1.7] DM-Sans">
-          Today's session focused on finalizing the engineering roadmap for Q2. The team addressed critical bottlenecks in the API layer and reached a consensus on adopting a micro-services architecture for the new billing module. Key milestones were established for the next three sprints, with a specific focus on cross-team dependencies between frontend and platform teams.
+          {summary || "No summary available for this meeting."}
         </p>
 
         {/* Outcome Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-6">
           <OutcomeCard 
             title="Decisions Made"
-            value="6 decisions"
-            subValue="2 critical"
+            value={`${stats?.decisions || 0} decisions`}
+            subValue="Pending review"
             icon={Gavel}
             iconBg="bg-blue-light"
             iconColor="text-blue"
           />
           <OutcomeCard 
             title="Action Items"
-            value="14 tasks"
-            subValue="3 overdue risk"
+            value={`${stats?.tasks || 0} tasks`}
+            subValue="Identified"
             icon={ListChecks}
             iconBg="bg-success-bg"
             iconColor="text-success"
           />
           <OutcomeCard 
             title="Follow-up Required"
-            value="2 items"
-            subValue="Assigned to you"
+            value={`${stats?.followups || 0} items`}
+            subValue="Pending action"
             icon={AlertTriangle}
             iconBg="bg-warning-bg"
             iconColor="text-warning"
           />
         </div>
+        {/* Key Topics Section */}
+        {keyTopics && keyTopics.length > 0 && (
+          <div className="mt-6 pt-6 border-t border-slate-50">
+            <h4 className="text-[12px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+              <ListChecks className="w-3.5 h-3.5" /> Key Topics Discussed
+            </h4>
+            <div className="flex flex-wrap gap-2">
+              {keyTopics.map((topic: any, i: number) => (
+                <Badge key={i} variant="secondary" className="bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors border-none py-1.5 px-3 rounded-lg text-[12px] font-medium">
+                  {typeof topic === 'string' ? topic : topic.topic}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

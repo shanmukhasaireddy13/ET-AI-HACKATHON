@@ -1,8 +1,6 @@
 "use client";
 
-import React from "react";
-
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   Bot, 
   User, 
@@ -15,12 +13,17 @@ import {
   Clock,
   Zap,
   MessageSquare,
-  Plug
+  Plug,
+  Mic,
+  ShieldCheck,
+  ShieldAlert
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { motion, AnimatePresence } from "framer-motion";
+import { createClient } from "@/lib/supabase/client";
+import { format } from "date-fns";
 
 interface ActivityLogEntry {
   id: string;
@@ -44,68 +47,75 @@ interface ActivityLogEntry {
   };
 }
 
-const mockLogs: ActivityLogEntry[] = [
-  {
-    id: "1",
-    level: "SUCCESS",
-    timestamp: new Date("2026-03-21T10:47:32"),
-    actor: { name: "Task Generator Agent", type: "agent", icon: <Zap className="w-3 h-3" />, color: "bg-blue-600" },
-    eventType: "Task Created",
-    description: "created 14 tasks from Engineering Planning",
-    status: "Completed",
-    details: {
-      input: "Meeting transcript: 'We need to fix the login bug...'",
-      output: "Generated 14 JSON task objects with priority and assignment.",
-      metadata: { "Duration": "2.14s", "Agent ID": "agent_003", "Session ID": "sess_abc123" }
-    }
-  },
-  {
-    id: "2",
-    level: "INFO",
-    timestamp: new Date("2026-03-21T10:45:10"),
-    actor: { name: "You", type: "manager" },
-    eventType: "Approval",
-    description: "approved Jira epic creation — PROJ-204",
-    status: "Completed",
-    details: {
-      input: "Approval Request for Epic: 'Mobile App Refresh'",
-      output: "Decision: APPROVED. Comments: 'Proceed with high priority.'",
-      metadata: { "Action": "Approve", "Priority": "High", "IP Address": "192.168.1.1" }
-    }
-  },
-  {
-    id: "3",
-    level: "ERROR",
-    timestamp: new Date("2026-03-21T10:42:05"),
-    actor: { name: "Jira Integration Agent", type: "agent", icon: <Plug className="w-3 h-3" />, color: "bg-slate-600" },
-    eventType: "Integration",
-    description: "pushed 14 tickets to Jira project BACKEND",
-    status: "Failed",
-    details: {
-      input: "14 task items for project BACKEND",
-      output: "None. Connection aborted.",
-      metadata: { "Project": "BACKEND", "Retries": "3", "Error Code": "JIRA_AUTH_401" },
-      error: "Error: Unauthorized. The Jira API token provided is invalid or has expired. \n   at JiraClient.push (jira_client.ts:142)\n   at Agent.execute (agent.ts:56)"
-    }
-  },
-  {
-    id: "4",
-    level: "WARNING",
-    timestamp: new Date("2026-03-21T10:40:00"),
-    actor: { name: "System", type: "system" },
-    eventType: "Config Change",
-    description: "detected Jira API timeout — retrying (attempt 2/3)",
-    status: "Retrying",
-    details: {
-      input: "Network Request: POST /api/v2/issue",
-      output: "Timeout after 5000ms",
-      metadata: { "Component": "NetworkAdapter", "Attempt": "2/3" }
-    }
-  }
-];
-
 export function ActivityTable() {
+  const [logs, setLogs] = useState<ActivityLogEntry[]>([]);
+  const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const supabase = createClient();
+
+  useEffect(() => {
+    async function fetchActivities() {
+      setLoading(true);
+      const [mRes, tRes, aRes, rRes] = await Promise.all([
+        supabase.from('meetings').select('*').order('created_at', { ascending: false }).limit(10),
+        supabase.from('tasks').select('*').order('created_at', { ascending: false }).limit(10),
+        supabase.from('approvals').select('*').order('created_at', { ascending: false }).limit(10),
+        supabase.from('agent_reasoning').select('*').order('created_at', { ascending: false }).limit(10)
+      ]);
+
+      const unified: ActivityLogEntry[] = [];
+
+      mRes.data?.forEach(m => unified.push({
+        id: `mtg-${m.id}`,
+        level: "INFO",
+        timestamp: new Date(m.created_at),
+        actor: { name: "Parser Agent", type: "agent", icon: <Mic className="w-3 h-3" />, color: "bg-blue-600" },
+        eventType: "Meeting Processed",
+        description: `analysed transcript for '${m.title}'`,
+        status: m.status === 'completed' ? "Completed" : "Pending",
+        details: { input: m.transcript || "No transcript provided", output: "Full analysis saved to DB.", metadata: { "ID": m.id } }
+      }));
+
+      tRes.data?.forEach(t => unified.push({
+        id: `tsk-${t.id}`,
+        level: "SUCCESS",
+        timestamp: new Date(t.created_at),
+        actor: { name: "Task Agent", type: "agent", icon: <Zap className="w-3 h-3" />, color: "bg-green-600" },
+        eventType: "Task Created",
+        description: `extracted action item: ${t.title}`,
+        status: "Completed",
+        details: { input: "Agent pipeline result", output: t.title, metadata: { "Priority": t.priority || "Medium", "Assignee": t.assignee || "None" } }
+      }));
+
+      aRes.data?.forEach(a => unified.push({
+        id: `app-${a.id}`,
+        level: a.status === 'pending' ? "WARNING" : "SUCCESS",
+        timestamp: new Date(a.created_at),
+        actor: { name: a.source_agent || "Agent", type: "agent", icon: <ShieldAlert className="w-3 h-3" />, color: "bg-orange-600" },
+        eventType: "Agent Approval",
+        description: `${a.status === 'pending' ? 'requested permission' : 'executed'} tool: ${a.tool_name}`,
+        status: a.status === 'pending' ? "Pending" : "Completed",
+        details: { input: JSON.stringify(a.tool_args), output: a.reason || "Action confirmed by manager.", metadata: { "Integration": "Jira" } }
+      }));
+
+      rRes.data?.forEach(r => unified.push({
+        id: `rea-${r.id}`,
+        level: r.status === 'failed' ? "ERROR" : "INFO",
+        timestamp: new Date(r.created_at),
+        actor: { name: r.agent_name || "Agent", type: "agent", icon: <Bot className="w-3 h-3" />, color: "bg-slate-700" },
+        eventType: "Agent Reasoning",
+        description: r.reasoning?.substring(0, 100) + "...",
+        status: r.status === 'completed' ? "Completed" : r.status === 'failed' ? "Failed" : "Pending",
+        details: { input: "Context observation", output: r.reasoning, metadata: { "Agent": r.agent_name } }
+      }));
+
+      unified.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+      setLogs(unified.slice(0, 20));
+      setLoading(false);
+    }
+
+    fetchActivities();
+  }, []);
 
   const toggleRow = (id: string) => {
     setExpandedId(expandedId === id ? null : id);
@@ -134,10 +144,17 @@ export function ActivityTable() {
   const getTypeStyles = (type: string) => {
     if (type.includes("Task")) return "text-blue border-blue-200 bg-blue-50/50";
     if (type.includes("Approval")) return "text-orange border-orange-200 bg-orange-50/50";
-    if (type.includes("Integration")) return "text-green border-green-200 bg-green-50/50";
-    if (type.includes("Error")) return "text-error border-error-200 bg-error-50/50";
+    if (type.includes("Meeting")) return "text-green border-green-200 bg-green-50/50";
     return "text-slate-500 border-slate-200 bg-slate-50/50";
   };
+
+  if (loading) {
+    return (
+      <div className="bg-white border border-slate-200 rounded-xl p-20 flex justify-center items-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
@@ -155,7 +172,7 @@ export function ActivityTable() {
             </tr>
           </thead>
           <tbody>
-            {mockLogs.map((log) => {
+            {logs.map((log) => {
               const isExpanded = expandedId === log.id;
               const isError = log.level === "ERROR";
               
@@ -170,7 +187,6 @@ export function ActivityTable() {
                     )}
                   >
                     <td className="pl-5 relative">
-                      {/* Level Border Indicator */}
                       {(log.level === "ERROR" || log.level === "WARNING") && (
                         <div className={cn(
                           "absolute left-0 top-0 bottom-0 w-[3px]",
@@ -183,8 +199,12 @@ export function ActivityTable() {
                     </td>
                     <td>
                       <div className="flex flex-col leading-tight">
-                        <span className="font-mono text-[12px] text-slate-700 font-medium">Mar 21, 2026</span>
-                        <span className="font-mono text-[11px] text-slate-400">10:47:32 AM</span>
+                        <span className="font-mono text-[12px] text-slate-700 font-medium">
+                          {format(log.timestamp, "MMM dd, yyyy")}
+                        </span>
+                        <span className="font-mono text-[11px] text-slate-400">
+                          {format(log.timestamp, "HH:mm:ss a")}
+                        </span>
                       </div>
                     </td>
                     <td>
@@ -193,18 +213,16 @@ export function ActivityTable() {
                           <div className={cn("w-6 h-6 rounded-full flex items-center justify-center text-white", log.actor.color)}>
                             {log.actor.icon}
                           </div>
-                        ) : log.actor.type === "manager" ? (
-                          <Avatar className="w-6 h-6 border border-slate-100">
-                            <AvatarFallback className="bg-blue-light/10 text-blue text-[10px] font-bold">ME</AvatarFallback>
-                          </Avatar>
                         ) : (
-                          <Settings className="w-4 h-4 text-slate-400" />
+                          <Avatar className="w-6 h-6 border border-slate-100">
+                             <AvatarFallback className="bg-blue-light/10 text-blue text-[10px] font-bold">ME</AvatarFallback>
+                          </Avatar>
                         )}
                         <span className="text-[13px] font-semibold text-slate-700">{log.actor.name}</span>
                       </div>
                     </td>
                     <td>
-                      <Badge variant="outline" className={cn("text-[11px] font-bold rounded-lg px-2 px-1 border", getTypeStyles(log.eventType))}>
+                      <Badge variant="outline" className={cn("text-[11px] font-bold rounded-lg px-2 py-0 border", getTypeStyles(log.eventType))}>
                         {log.eventType}
                       </Badge>
                     </td>
@@ -222,12 +240,11 @@ export function ActivityTable() {
                     </td>
                     <td className="pr-5 text-right">
                       <button className="text-blue text-[12px] font-bold hover:underline">
-                        View →
+                        {isExpanded ? "Close" : "View →"}
                       </button>
                     </td>
                   </tr>
                   
-                  {/* Expanded Detail View */}
                   <AnimatePresence>
                     {isExpanded && (
                       <tr>
@@ -241,60 +258,37 @@ export function ActivityTable() {
                           >
                             <div className="pt-4 pb-6 pl-[74px] pr-8">
                               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                {/* Input */}
                                 <div>
                                   <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2.5 flex items-center justify-between">
-                                    Input
-                                    <button className="text-blue hover:underline normal-case font-semibold">Copy</button>
+                                    Context Input
                                   </div>
-                                  <div className="bg-white border border-slate-200 rounded-lg p-3 font-mono text-[12px] leading-relaxed text-slate-600 whitespace-pre-wrap min-h-[100px]">
+                                  <div className="bg-white border border-slate-200 rounded-lg p-3 font-mono text-[11px] leading-relaxed text-slate-600 whitespace-pre-wrap min-h-[80px]">
                                     {log.details.input}
                                   </div>
                                 </div>
-
-                                {/* Output */}
                                 <div>
                                   <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2.5 flex items-center justify-between">
-                                    Output
-                                    <button className="text-blue hover:underline normal-case font-semibold">Copy</button>
+                                    Result / Output
                                   </div>
-                                  <div className="bg-white border border-slate-200 rounded-lg p-3 font-mono text-[12px] leading-relaxed text-slate-600 whitespace-pre-wrap min-h-[100px]">
+                                  <div className="bg-white border border-slate-200 rounded-lg p-3 font-mono text-[11px] leading-relaxed text-slate-600 whitespace-pre-wrap min-h-[80px]">
                                     {log.details.output}
                                   </div>
                                 </div>
-
-                                {/* Metadata */}
                                 <div>
                                   <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2.5">Metadata</div>
                                   <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
                                     {Object.entries(log.details.metadata).map(([key, value], i) => (
                                       <div key={key} className={cn(
-                                        "flex items-center justify-between p-2.5 text-[12px]",
+                                        "flex items-center justify-between p-2.5 text-[11px]",
                                         i !== 0 && "border-t border-slate-50"
                                       )}>
-                                        <span className="text-slate-400">{key}:</span>
+                                        <span className="text-slate-400 font-bold uppercase tracking-tighter">{key}:</span>
                                         <span className="font-semibold text-slate-700">{value}</span>
                                       </div>
                                     ))}
-                                    <div className="flex items-center justify-between p-2.5 text-[12px] border-t border-slate-50">
-                                      <span className="text-slate-400">Meeting ID:</span>
-                                      <button className="text-blue hover:underline font-semibold flex items-center gap-1">
-                                        mtg_xyz789 <ExternalLink className="w-3 h-3" />
-                                      </button>
-                                    </div>
                                   </div>
                                 </div>
                               </div>
-
-                              {/* Error Stack Trace */}
-                              {log.details.error && (
-                                <div className="mt-6">
-                                  <div className="text-[10px] font-bold text-error uppercase tracking-widest mb-2.5">Error Detail & Stack Trace</div>
-                                  <div className="bg-error-bg/20 border border-error/10 rounded-lg p-3 font-mono text-[11px] leading-relaxed text-error-dark whitespace-pre-wrap overflow-x-auto">
-                                    {log.details.error}
-                                  </div>
-                                </div>
-                              )}
                             </div>
                           </motion.div>
                         </td>

@@ -1,305 +1,297 @@
 """
-💾 SQLite Persistence Layer for SIDD
-=====================================
-Stores all meeting workflow results in a local sidd.db file.
+🚀 Supabase Persistence Layer for SIDD
+======================================
+Stores all meeting workflow results in Supabase PostgreSQL via PostgREST.
 """
 
-import sqlite3
+import os
 import json
 import uuid
+from typing import Optional, Dict
+import requests
 from datetime import datetime
-from pathlib import Path
+from dotenv import load_dotenv
 
-DB_PATH = Path(__file__).resolve().parent.parent / "sidd.db"
+# Load env from SIDD folder
+load_dotenv()
 
+PROJECT_URL = os.getenv("PROJECT_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+GATEWAY_URL = os.getenv("GATEWAY_URL", "http://localhost:3001")
 
-def _get_conn() -> sqlite3.Connection:
-    """Get a connection with row_factory for dict-like access."""
-    conn = sqlite3.connect(str(DB_PATH))
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA foreign_keys=ON")
-    return conn
-
+HEADERS = {
+    "apikey": SUPABASE_KEY,
+    "Authorization": f"Bearer {SUPABASE_KEY}",
+    "Content-Type": "application/json",
+    "Prefer": "return=representation"
+}
 
 def init_db():
-    """Create all tables if they don't already exist."""
-    conn = _get_conn()
-    conn.executescript("""
-        CREATE TABLE IF NOT EXISTS meetings (
-            id              TEXT PRIMARY KEY,
-            transcript      TEXT NOT NULL,
-            summary         TEXT DEFAULT '',
-            orchestrator_reasoning TEXT DEFAULT '',
-            dynamic_steps   TEXT DEFAULT '[]',
-            completed_steps TEXT DEFAULT '[]',
-            created_at      TEXT NOT NULL
-        );
+    """No-op for Supabase as schema is managed via migrations."""
+    pass
 
-        CREATE TABLE IF NOT EXISTS tasks (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            meeting_id  TEXT NOT NULL REFERENCES meetings(id),
-            assignee    TEXT DEFAULT '',
-            task        TEXT NOT NULL,
-            priority    TEXT DEFAULT 'medium',
-            status      TEXT DEFAULT 'pending',
-            due_at      TEXT DEFAULT ''
-        );
-
-        CREATE TABLE IF NOT EXISTS events (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            meeting_id  TEXT NOT NULL REFERENCES meetings(id),
-            title       TEXT NOT NULL,
-            time        TEXT DEFAULT '',
-            attendees   TEXT DEFAULT '[]'
-        );
-
-        CREATE TABLE IF NOT EXISTS bug_tickets (
-            id              INTEGER PRIMARY KEY AUTOINCREMENT,
-            meeting_id      TEXT NOT NULL REFERENCES meetings(id),
-            title           TEXT NOT NULL,
-            severity        TEXT DEFAULT 'medium',
-            jira_ticket_id  TEXT DEFAULT ''
-        );
-
-        CREATE TABLE IF NOT EXISTS followups (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            meeting_id  TEXT NOT NULL REFERENCES meetings(id),
-            item        TEXT NOT NULL,
-            owner       TEXT DEFAULT ''
-        );
-
-        CREATE TABLE IF NOT EXISTS execution_results (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            meeting_id  TEXT NOT NULL REFERENCES meetings(id),
-            step        INTEGER DEFAULT 0,
-            tool        TEXT DEFAULT '',
-            source      TEXT DEFAULT '',
-            result      TEXT DEFAULT '{}'
-        );
-
-        CREATE TABLE IF NOT EXISTS audit_log (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            meeting_id  TEXT NOT NULL REFERENCES meetings(id),
-            entry       TEXT NOT NULL
-        );
-
-        CREATE TABLE IF NOT EXISTS pending_approvals (
-            id          TEXT PRIMARY KEY,
-            meeting_id  TEXT NOT NULL REFERENCES meetings(id),
-            tool        TEXT NOT NULL,
-            args        TEXT DEFAULT '{}',
-            source_agent TEXT DEFAULT '',
-            status      TEXT DEFAULT 'pending',
-            reason      TEXT DEFAULT '',
-            approved_by TEXT DEFAULT '',
-            feedback    TEXT DEFAULT '',
-            created_at  TEXT NOT NULL,
-            decided_at  TEXT DEFAULT ''
-        );
-
-        CREATE TABLE IF NOT EXISTS agent_reasoning (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            meeting_id  TEXT NOT NULL REFERENCES meetings(id),
-            agent       TEXT NOT NULL,
-            reasoning   TEXT NOT NULL,
-            outputs     TEXT DEFAULT '[]',
-            created_at  TEXT NOT NULL
-        );
-
-        CREATE TABLE IF NOT EXISTS integrations (
-            id          TEXT PRIMARY KEY,
-            service     TEXT NOT NULL UNIQUE,
-            base_url    TEXT DEFAULT '',
-            email       TEXT DEFAULT '',
-            api_token   TEXT DEFAULT '',
-            project_key TEXT DEFAULT '',
-            extra       TEXT DEFAULT '{}',
-            status      TEXT DEFAULT 'connected',
-            connected_at TEXT NOT NULL
-        );
-    """)
-    
-    # Safely inject missing columns for older databases
-    _safe_alter(conn, "meetings", "dynamic_steps", "TEXT DEFAULT '[]'")
-    _safe_alter(conn, "meetings", "completed_steps", "TEXT DEFAULT '[]'")
-    _safe_alter(conn, "tasks", "status", "TEXT DEFAULT 'pending'")
-    _safe_alter(conn, "tasks", "due_at", "TEXT DEFAULT ''")
-
-    conn.commit()
-    conn.close()
-
-
-def _safe_alter(conn, table, column, col_type):
-    """Add a column if it doesn't exist (SQLite has no IF NOT EXISTS for ALTER)."""
+def _post(table: str, data: dict):
+    url = f"{PROJECT_URL}/rest/v1/{table}"
     try:
-        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")
-    except sqlite3.OperationalError:
-        pass
+        resp = requests.post(url, headers=HEADERS, json=data)
+        resp.raise_for_status()
+        res_data = resp.json()
+        if isinstance(res_data, list) and len(res_data) > 0:
+            return res_data[0]
+        return res_data
+    except Exception as e:
+        print(f"❌ Supabase POST Error ({table}): {e}")
+        return None
 
+def record_activity(category: str, action: str, description: str = "", entity_id: Optional[str] = None, entity_type: Optional[str] = None, metadata: Optional[Dict] = None):
+    """Log a unified activity event to Supabase."""
+    payload = {
+        "category": category,
+        "action": action,
+        "description": description,
+        "metadata": metadata or {}
+    }
+    if entity_id: payload["entity_id"] = entity_id
+    if entity_type: payload["entity_type"] = entity_type
+    
+    return _post("activity_events", payload)
 
 def save_meeting_results(state: dict) -> str:
-    """
-    Persist the final LangGraph state into SQLite.
-    Returns the generated meeting_id.
-    """
-    init_db()
-    conn = _get_conn()
+    """Persist the final LangGraph state into Supabase."""
+    meeting_id = state.get("meeting_id")
+    if not meeting_id:
+        return ""
 
-    meeting_id = state.get("meeting_id") or f"mtg-{uuid.uuid4().hex[:8]}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+    # 1. Update/Inject summary into meetings table
+    url = f"{PROJECT_URL}/rest/v1/meetings?id=eq.{meeting_id}"
+    update_data = {
+        "summary": state.get("meeting_summary", ""),
+        "status": "completed",
+    }
+    requests.patch(url, headers=HEADERS, json=update_data)
 
-    # ── meetings table ──
-    conn.execute(
-        "INSERT INTO meetings (id, transcript, summary, orchestrator_reasoning, dynamic_steps, completed_steps, created_at) VALUES (?,?,?,?,?,?,?)",
-        (
-            meeting_id,
-            state.get("meeting_transcript", ""),
-            state.get("meeting_summary", ""),
-            state.get("orchestrator_reasoning", ""),
-            json.dumps(state.get("dynamic_steps", [])),
-            json.dumps(state.get("completed_steps", [])),
-            datetime.now().isoformat(),
-        ),
-    )
-
-    # ── tasks ──
+    # 2. Tasks
     for t in state.get("assigned_tasks", []):
-        conn.execute(
-            "INSERT INTO tasks (meeting_id, assignee, task, priority) VALUES (?,?,?,?)",
-            (meeting_id, t.get("assignee", ""), t.get("task", str(t)), t.get("priority", "medium")),
-        )
+        task_payload = {
+            "meeting_id": meeting_id,
+            "title": t.get("title", str(t)) if isinstance(t, dict) else str(t),
+            "assignee_name": t.get("assignee", "Unassigned") if isinstance(t, dict) else "Unassigned",
+            "priority": t.get("priority", "medium") if isinstance(t, dict) else "medium",
+            "status": "pending"
+        }
+        
+        # Only add due_at if it's not TBD and exists
+        deadline = t.get("deadline") if isinstance(t, dict) else None
+        if deadline and deadline != "TBD":
+            try:
+                # Basic check for date-like string before sending
+                task_payload["due_at"] = deadline
+            except:
+                pass
+                
+        _post("tasks", task_payload)
 
-    # ── events ──
+    # 3. Events
     for ev in state.get("scheduled_events", []):
-        conn.execute(
-            "INSERT INTO events (meeting_id, title, time, attendees) VALUES (?,?,?,?)",
-            (meeting_id, ev.get("title", str(ev)), ev.get("time", ""), json.dumps(ev.get("attendees", []))),
-        )
+        _post("events", {
+            "meeting_id": meeting_id,
+            "title": ev.get("title", str(ev)),
+            "time": ev.get("time", ""),
+            "attendees": ev.get("attendees", [])
+        })
 
-    # ── bug_tickets ──
+    # 4. Bug Tickets
     for bt in state.get("bug_tickets", []):
-        conn.execute(
-            "INSERT INTO bug_tickets (meeting_id, title, severity, jira_ticket_id) VALUES (?,?,?,?)",
-            (meeting_id, bt.get("title", str(bt)), bt.get("severity", "medium"), bt.get("jira_ticket_id", "")),
-        )
+        _post("bug_tickets", {
+            "meeting_id": meeting_id,
+            "title": bt.get("title", str(bt)),
+            "severity": bt.get("severity", "medium"),
+            "jira_ticket_id": bt.get("jira_ticket_id", "")
+        })
 
-    # ── followups ──
+    # 5. Followups
     for fu in state.get("followup_items", []):
-        conn.execute(
-            "INSERT INTO followups (meeting_id, item, owner) VALUES (?,?,?)",
-            (meeting_id, fu.get("item", str(fu)), fu.get("owner", "")),
-        )
+        _post("followups", {
+            "meeting_id": meeting_id,
+            "item": fu.get("item", str(fu)),
+            "owner": fu.get("owner", "")
+        })
 
-    # ── execution_results ──
-    for er in state.get("execution_results", []):
-        conn.execute(
-            "INSERT INTO execution_results (meeting_id, step, tool, source, result) VALUES (?,?,?,?,?)",
-            (meeting_id, er.get("step", 0), er.get("tool", ""), er.get("source", ""), json.dumps(er.get("result", {}))),
-        )
-
-    # ── audit_log ──
-    for entry in state.get("audit_log", []):
-        conn.execute(
-            "INSERT INTO audit_log (meeting_id, entry) VALUES (?,?)",
-            (meeting_id, str(entry)),
-        )
-
-    # ── pending_approvals ──
+    # 6. Approvals (PostgreSQL table: approvals)
     for ap in state.get("pending_approvals", []):
+        _post("approvals", {
+            "meeting_id": meeting_id,
+            "tool_name": ap.get("tool", ""),
+            "args": ap.get("args", {}),
+            "source_agent": ap.get("source_agent", ""),
+            "status": "pending",
+            "reason": ap.get("reason", "")
+        })
+
+    # 7. Agent Reasoning & Metrics Update
+    for ar in state.get("agent_reasoning", []):
+        agent_name = ar.get("agent", "")
+        _post("agent_reasoning", {
+            "meeting_id": meeting_id,
+            "agent_name": agent_name,
+            "reasoning": ar.get("reasoning", ""),
+            "context_data": ar.get("outputs_produced", {}) if isinstance(ar.get("outputs_produced"), dict) else {"outputs": ar.get("outputs_produced")}
+        })
+        
+        # Update Metrics (Increment tasks_done)
         try:
-            conn.execute(
-                "INSERT OR REPLACE INTO pending_approvals (id, meeting_id, tool, args, source_agent, status, reason, created_at) VALUES (?,?,?,?,?,?,?,?)",
-                (ap.get("id", ""), meeting_id, ap.get("tool", ""), json.dumps(ap.get("args", {})),
-                 ap.get("source_agent", ""), ap.get("status", "pending"), ap.get("reason", ""),
-                 ap.get("created_at", datetime.now().isoformat())),
-            )
-        except Exception:
+            m_url = f"{PROJECT_URL}/rest/v1/agent_metrics?agent_id=eq.{agent_name}"
+            m_resp = requests.get(m_url, headers=HEADERS)
+            if m_resp.status_code == 200 and m_resp.json():
+                curr = m_resp.json()[0]
+                requests.patch(m_url, headers=HEADERS, json={
+                    "tasks_done": curr["tasks_done"] + 1,
+                    "last_active_at": datetime.now().isoformat()
+                })
+        except:
             pass
 
-    # ── agent_reasoning ──
-    for ar in state.get("agent_reasoning", []):
-        conn.execute(
-            "INSERT INTO agent_reasoning (meeting_id, agent, reasoning, outputs, created_at) VALUES (?,?,?,?,?)",
-            (meeting_id, ar.get("agent", ""), ar.get("reasoning", ""),
-             json.dumps(ar.get("outputs_produced", [])), ar.get("timestamp", datetime.now().isoformat())),
-        )
+    # 8. Decisions (Extracted meeting decisions)
+    for dec in state.get("decisions", []):
+        decision_text = str(dec)
+        if isinstance(dec, dict):
+            # Try multiple common keys the LLM might use
+            decision_text = dec.get("decision") or dec.get("text") or dec.get("value") or str(dec)
+            
+        _post("decisions", {
+            "meeting_id": meeting_id,
+            "text": decision_text,
+            "priority": dec.get("priority", "Normal") if isinstance(dec, dict) else "Normal",
+            "confidence": int(str(dec.get("confidence", 90)).replace("%","")) if isinstance(dec, dict) else 90,
+            "timestamp": dec.get("timestamp", "") if isinstance(dec, dict) else ""
+        })
 
-    conn.commit()
-    conn.close()
+    # 9. Key Topics
+    for topic in state.get("key_topics", []):
+        _post("key_topics", {
+            "meeting_id": meeting_id,
+            "topic": str(topic)
+        })
 
-    print(f"   💾 Meeting results saved to database  (id: {meeting_id})")
+    # 10. Log Completion Activity
+    # 10. Sync to MongoDB via Express Gateway (The Archive)
+    sync_results_to_mongo(meeting_id, state)
+
+    record_activity(
+        category="meeting",
+        action="analyzed",
+        description=f"Meeting analyzed successfully.",
+        entity_id=meeting_id,
+        entity_type="meeting"
+    )
+
+    print(f"   🚀 Meeting results synced to Supabase & MongoDB (id: {meeting_id})")
     return meeting_id
 
 
-# ═════════════════════════════════════════
-#  QUERY HELPERS
-# ═════════════════════════════════════════
+def sync_agent_reasoning(meeting_id: str, agent_name: str, reasoning: str, outputs: dict = None, status: str = "completed"):
+    """
+    ⚡ REAL-TIME SYNC
+    Updates Supabase agent_reasoning table immediately so the frontend updates its status.
+    """
+    if not meeting_id: return
+    
+    payload = {
+        "meeting_id": meeting_id,
+        "agent_name": agent_name,
+        "reasoning": reasoning,
+        "status": status,
+        "context_data": outputs or {}
+    }
+    _post("agent_reasoning", payload)
+
+
+def sync_results_to_mongo(meeting_id: str, state: dict):
+    """
+    📦 ARCHIVAL SYNC
+    Calls the Express Gateway to update the MongoDB document with the final snapshot.
+    """
+    url = f"{GATEWAY_URL}/api/meetings/{meeting_id}/sync"
+    
+    # Format tasks for MongoDB array
+    tasks = []
+    for t in state.get("assigned_tasks", []):
+        if isinstance(t, dict):
+            tasks.append({
+                "title": t.get("title", ""),
+                "assignee": t.get("assignee", "Unassigned"),
+                "priority": t.get("priority", "medium"),
+                "status": "pending"
+            })
+            
+    # Format decisions for MongoDB array
+    decisions = []
+    for d in state.get("decisions", []):
+        if isinstance(d, dict):
+            decisions.append({
+                "text": d.get("decision", str(d)),
+                "rationale": d.get("rationale", ""),
+                "owner": d.get("owner", "")
+            })
+
+    payload = {
+        "summary": state.get("meeting_summary", ""),
+        "tasks": tasks,
+        "decisions": decisions,
+        "status": "completed"
+    }
+    
+    try:
+        requests.patch(url, headers=HEADERS, json=payload)
+    except Exception as e:
+        print(f"⚠️ MongoDB Sync Error: {e}")
 
 def get_meeting(meeting_id: str) -> dict:
-    """Retrieve a single meeting and all related data."""
-    init_db()
-    conn = _get_conn()
-
-    row = conn.execute("SELECT * FROM meetings WHERE id = ?", (meeting_id,)).fetchone()
-    if not row:
-        conn.close()
-        return {}
-
-    meeting = dict(row)
-    meeting["dynamic_steps"] = json.loads(meeting.get("dynamic_steps", "[]"))
-    meeting["completed_steps"] = json.loads(meeting.get("completed_steps", "[]"))
-    meeting["tasks"] = [dict(r) for r in conn.execute("SELECT * FROM tasks WHERE meeting_id = ?", (meeting_id,)).fetchall()]
-    meeting["events"] = [dict(r) for r in conn.execute("SELECT * FROM events WHERE meeting_id = ?", (meeting_id,)).fetchall()]
-    meeting["bug_tickets"] = [dict(r) for r in conn.execute("SELECT * FROM bug_tickets WHERE meeting_id = ?", (meeting_id,)).fetchall()]
-    meeting["followups"] = [dict(r) for r in conn.execute("SELECT * FROM followups WHERE meeting_id = ?", (meeting_id,)).fetchall()]
-    meeting["execution_results"] = [dict(r) for r in conn.execute("SELECT * FROM execution_results WHERE meeting_id = ?", (meeting_id,)).fetchall()]
-    meeting["audit_log"] = [dict(r) for r in conn.execute("SELECT * FROM audit_log WHERE meeting_id = ?", (meeting_id,)).fetchall()]
-    meeting["pending_approvals"] = [dict(r) for r in conn.execute("SELECT * FROM pending_approvals WHERE meeting_id = ?", (meeting_id,)).fetchall()]
-    meeting["agent_reasoning"] = [dict(r) for r in conn.execute("SELECT * FROM agent_reasoning WHERE meeting_id = ?", (meeting_id,)).fetchall()]
-
-    conn.close()
-    return meeting
-
-
-def get_all_meetings() -> list:
-    """List all meetings (summary only, no child records)."""
-    init_db()
-    conn = _get_conn()
-    rows = conn.execute("SELECT id, summary, orchestrator_reasoning, dynamic_steps, created_at FROM meetings ORDER BY created_at DESC").fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
-
-
-def get_pending_approvals(meeting_id: str = None, status: str = None) -> list:
-    """Get pending approvals, optionally filtered by meeting_id and/or status."""
-    init_db()
-    conn = _get_conn()
-    query = "SELECT * FROM pending_approvals WHERE 1=1"
-    params = []
-    if meeting_id:
-        query += " AND meeting_id = ?"
-        params.append(meeting_id)
-    if status:
-        query += " AND status = ?"
-        params.append(status)
-    query += " ORDER BY created_at DESC"
-    rows = conn.execute(query, params).fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
-
+    """Retrieve meeting data for API snapshots."""
+    url = f"{PROJECT_URL}/rest/v1/meetings?id=eq.{meeting_id}&select=*,tasks(count)"
+    resp = requests.get(url, headers=HEADERS)
+    data = resp.json()
+    return data[0] if data else {}
 
 def decide_approval(approval_id: str, decision: str, approved_by: str = "", feedback: str = "") -> dict:
-    """Approve or reject a pending approval. Returns the updated record."""
-    init_db()
-    conn = _get_conn()
-    conn.execute(
-        "UPDATE pending_approvals SET status = ?, approved_by = ?, feedback = ?, decided_at = ? WHERE id = ?",
-        (decision, approved_by, feedback, datetime.now().isoformat(), approval_id)
-    )
-    conn.commit()
-    row = conn.execute("SELECT * FROM pending_approvals WHERE id = ?", (approval_id,)).fetchone()
-    conn.close()
-    if row:
-        return dict(row)
-    return {}
+    """Update approval status in Supabase."""
+    url = f"{PROJECT_URL}/rest/v1/approvals?id=eq.{approval_id}"
+    update_data = {
+        "status": decision,
+        "decided_at": datetime.now().isoformat()
+    }
+    resp = requests.patch(url, headers=HEADERS, json=update_data)
+    # Fetch updated
+    resp = requests.get(f"{PROJECT_URL}/rest/v1/approvals?id=eq.{approval_id}", headers=HEADERS)
+    data = resp.json()
+    return data[0] if data else {}
 
+def save_execution_step(meeting_id: str, step_data: dict) -> dict:
+    """Log a granular execution step to Supabase (The Technical Trace)."""
+    if not meeting_id:
+        return {}  # Skip saving if testing locally without a UUID
+
+    try:
+        criticality = int(step_data.get("criticality", 5))
+    except (ValueError, TypeError):
+        criticality = 5
+
+    payload = {
+        "meeting_id": meeting_id,
+        "step_index": step_data.get("step_index", 0),
+        "agent_role": step_data.get("agent_role", "SIDD_Brain"),
+        "thought": step_data.get("thought", ""),
+        "tool_name": step_data.get("tool_name", ""),
+        "tool_args": step_data.get("tool_args", {}),
+        "criticality": criticality,
+        "status": step_data.get("status", "pending"),
+        "result": step_data.get("result", {}),
+        "error": step_data.get("error", "")
+    }
+    
+    return _post("agent_execution_steps", payload)
+
+def update_execution_step(step_id: str, update_data: dict):
+    """Update an existing execution step (e.g., mark as success/failed)."""
+    url = f"{PROJECT_URL}/rest/v1/agent_execution_steps?id=eq.{step_id}"
+    requests.patch(url, headers=HEADERS, json=update_data)

@@ -29,35 +29,35 @@ const StatCard = ({ icon: Icon, value, label, iconColor, iconBg, textColor = "te
   </div>
 );
 
-export function MeetingsStats() {
+export function MeetingsStats({ stats }: { stats: { total: number, completed: number, analysing: number, tasks: number } }) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-[12px] mb-[20px]">
       <StatCard 
         icon={Mic}
-        value="47"
+        value={stats.total}
         label="Total Meetings"
         iconColor="text-[#2563EB]"
         iconBg="bg-[#EFF6FF]"
       />
       <StatCard 
         icon={CheckCircle2}
-        value="42"
+        value={stats.completed}
         label="Completed"
         iconColor="text-[#16A34A]"
         iconBg="bg-[#F0FDF4]"
       />
       <StatCard 
         icon={Loader2}
-        value="3"
+        value={stats.analysing}
         label="Analysing"
         iconColor="text-[#EA580C]"
         iconBg="bg-[#FFF7ED]"
         textColor="text-[#EA580C]"
-        isSpinning
+        isSpinning={stats.analysing > 0}
       />
       <StatCard 
         icon={CheckSquare}
-        value="214"
+        value={stats.tasks}
         label="Tasks Extracted"
         iconColor="text-[#2563EB]"
         iconBg="bg-[#EFF6FF]"

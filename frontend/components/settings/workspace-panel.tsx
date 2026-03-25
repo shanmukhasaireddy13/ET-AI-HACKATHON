@@ -11,8 +11,25 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { useState, useEffect } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 export function WorkspacePanel() {
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    async function fetchUser() {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+    }
+    fetchUser();
+  }, []);
+
+  const domain = user?.email?.split('@')[1]?.split('.')[0] || "acme";
+  const workspaceName = domain.charAt(0).toUpperCase() + domain.slice(1) + " Engineering";
+  const workspaceSlug = domain + "-engineering";
+
   return (
     <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
       {/* Panel Header */}
@@ -52,7 +69,7 @@ export function WorkspacePanel() {
               <h4 className="text-[13px] font-semibold text-slate-900">Workspace Name</h4>
               <p className="text-[12px] text-slate-500 mt-1">The display name of your organization within MeetingMind.</p>
             </div>
-            <Input defaultValue="Acme Engineering" className="h-10 w-full sm:w-[320px] border-slate-200 rounded-lg focus:ring-blue/10 font-medium" />
+            <Input defaultValue={workspaceName} className="h-10 w-full sm:w-[320px] border-slate-200 rounded-lg focus:ring-blue/10 font-medium capitalize" />
           </div>
 
           {/* Slug Row */}
@@ -65,7 +82,7 @@ export function WorkspacePanel() {
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[13px] text-slate-400 font-medium select-none">
                 meetingmind.io/
               </span>
-              <Input defaultValue="acme-engineering" className="h-10 pl-[110px] border-slate-200 rounded-lg focus:ring-blue/10 font-bold text-blue" />
+              <Input defaultValue={workspaceSlug} className="h-10 pl-[110px] border-slate-200 rounded-lg focus:ring-blue/10 font-bold text-blue" />
             </div>
           </div>
 

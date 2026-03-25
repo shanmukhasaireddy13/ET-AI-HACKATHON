@@ -11,61 +11,72 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { format } from "date-fns";
+import Link from "next/link";
 
-const MEETINGS = [
-  {
-    id: "1",
-    name: "Engineering Planning Q2",
-    source: "Zoom",
-    date: "Mar 21",
-    time: "10:30 AM",
-    tasks: 12,
-    status: "Analysing",
-    agents: [1, 2, 3, 4, 5]
-  },
-  {
-    id: "2",
-    name: "Weekly Design Sync",
-    source: "Google Meet",
-    date: "Mar 20",
-    time: "2:00 PM",
-    tasks: 8,
-    status: "Complete",
-    agents: [1, 2, 3]
-  },
-  {
-    id: "3",
-    name: "Product Roadmap Review",
-    source: "Teams",
-    date: "Mar 19",
-    time: "11:15 AM",
-    tasks: 15,
-    status: "Complete",
-    agents: [1, 2, 4]
-  },
-  {
-    id: "4",
-    name: "Customer Feedback Session",
-    source: "Zoom",
-    date: "Mar 19",
-    time: "9:00 AM",
-    tasks: 5,
-    status: "Failed",
-    agents: [1, 6]
-  },
-  {
-    id: "5",
-    name: "Marketing Brainstorm",
-    source: "Teams",
-    date: "Mar 18",
-    time: "4:30 PM",
-    tasks: 0,
-    status: "Queued",
-    agents: []
-  }
-];
+type MeetingRecord = {
+  id: string;
+  title: string;
+  status: string;
+  created_at: string;
+  tasks_count?: number;
+};
 
 export function MeetingsTable() {
+  const [meetings, setMeetings] = useState<MeetingRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const supabase = createClient();
+
+  useEffect(() => {
+    async function fetchMeetings() {
+      setLoading(true);
+      // Fetch meetings and join with task counts
+      const { data, error } = await supabase
+        .from('meetings')
+        .select(`
+          *,
+          tasks:tasks(count)
+        `)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (error) {
+        console.error("Error fetching meetings:", error);
+      } else {
+        const formatted = data.map((m: any) => ({
+          ...m,
+          tasks_count: m.tasks?.[0]?.count || 0
+        }));
+        setMeetings(formatted);
+      }
+      setLoading(false);
+    }
+
+    fetchMeetings();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="bg-white border border-border-dash rounded-xl p-8 flex justify-center items-center shadow-sm">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue"></div>
+      </div>
+    );
+  }
+
+  if (meetings.length === 0) {
+    return (
+      <div className="bg-white border border-border-dash rounded-xl p-12 text-center shadow-sm">
+        <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
+          <Mic className="w-6 h-6 text-slate-300" />
+        </div>
+        <h3 className="text-[15px] font-semibold text-slate-900">No meetings found</h3>
+        <p className="text-[13px] text-slate-500 mt-1 max-w-[240px] mx-auto">Upload your first meeting transcript to get started with AI analysis.</p>
+        <Button size="sm" className="mt-6 bg-blue hover:bg-blue-hover text-white h-8 text-[12px]">Upload Meeting</Button>
+      </div>
+    );
+  }
   return (
     <div className="bg-white border border-border-dash rounded-xl overflow-hidden">
       <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center">
@@ -87,23 +98,23 @@ export function MeetingsTable() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {MEETINGS.map((meeting) => (
+          {meetings.map((meeting) => (
             <TableRow key={meeting.id} className="group border-slate-50 hover:bg-slate-50/50 transition-colors">
               <TableCell className="py-3.5 pl-5">
                 <div className="max-w-[280px]">
-                  <p className="text-[14px] font-medium text-[#0F172A] truncate mb-0.5">{meeting.name}</p>
+                  <p className="text-[14px] font-medium text-[#0F172A] truncate mb-0.5">{meeting.title}</p>
                   <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
                     <Video className="w-3 h-3" />
-                    <span>via {meeting.source}</span>
+                    <span>via Zoom</span>
                   </div>
                 </div>
               </TableCell>
               <TableCell>
-                <p className="text-[13px] text-[#334155]">{meeting.date}</p>
-                <p className="text-[11px] text-slate-400">{meeting.time}</p>
+                <p className="text-[13px] text-[#334155]">{format(new Date(meeting.created_at), 'MMM dd')}</p>
+                <p className="text-[11px] text-slate-400">{format(new Date(meeting.created_at), 'p')}</p>
               </TableCell>
               <TableCell>
-                <span className="text-[13px] font-semibold text-blue">{meeting.tasks}</span>
+                <span className="text-[13px] font-semibold text-blue">{meeting.tasks_count}</span>
                 <span className="text-[11px] text-slate-400 ml-1">tasks</span>
               </TableCell>
               <TableCell>
@@ -111,22 +122,19 @@ export function MeetingsTable() {
               </TableCell>
               <TableCell>
                 <div className="flex items-center -space-x-1.5">
-                  {meeting.agents.slice(0, 3).map((_, i) => (
+                  {[1, 2, 3].map((_, i) => (
                     <div key={i} className="w-5 h-5 rounded-full bg-blue-light border-2 border-white flex items-center justify-center text-[10px] text-blue font-bold">
                       {i + 1}
                     </div>
                   ))}
-                  {meeting.agents.length > 3 && (
-                    <div className="w-5 h-5 rounded-full bg-slate-100 border-2 border-white flex items-center justify-center text-[9px] text-slate-500 font-bold">
-                      +{meeting.agents.length - 3}
-                    </div>
-                  )}
                 </div>
               </TableCell>
               <TableCell className="pr-5 text-right">
-                <Button variant="outline" size="sm" className="h-7 px-3 text-[12px] bg-dash-bg border-border-dash hover:border-blue hover:text-blue transition-all">
-                  View
-                </Button>
+                <Link href={`/dashboard/meetings/${meeting.id}`}>
+                  <Button variant="outline" size="sm" className="h-7 px-3 text-[12px] bg-dash-bg border-border-dash hover:border-blue hover:text-blue transition-all">
+                    View
+                  </Button>
+                </Link>
               </TableCell>
             </TableRow>
           ))}
