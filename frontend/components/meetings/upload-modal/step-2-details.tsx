@@ -19,6 +19,11 @@ interface Step2Props {
 }
 
 export function Step2Details({ onNext, onBack }: Step2Props) {
+  const [title, setTitle] = useState("New Meeting Analysis");
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [time, setTime] = useState("10:00");
+  const [duration, setDuration] = useState(60);
+  const [platform, setPlatform] = useState("zoom");
   const [participants, setParticipants] = useState<string[]>(["Shanmukha Sai", "Sai Reddy"]);
   const [inputValue, setInputValue] = useState("");
 
@@ -33,6 +38,17 @@ export function Step2Details({ onNext, onBack }: Step2Props) {
     setParticipants(participants.filter(p => p !== name));
   };
 
+  const handleSubmit = () => {
+    onNext({
+      title,
+      date,
+      time,
+      duration,
+      platform,
+      participants
+    });
+  };
+
   return (
     <div className="p-7 space-y-6">
       {/* Meeting Title */}
@@ -41,6 +57,8 @@ export function Step2Details({ onNext, onBack }: Step2Props) {
          <Input 
           placeholder="e.g. Q2 Engineering Planning"
           className="h-11 border-[#E2E8F0] rounded-lg text-[14px]"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
          />
       </div>
 
@@ -50,14 +68,24 @@ export function Step2Details({ onNext, onBack }: Step2Props) {
             <label className="text-[12px] font-bold text-[#64748B] uppercase tracking-wider">Date</label>
             <div className="relative">
                <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#94A3B8]" />
-               <Input type="date" className="h-11 pl-10 border-[#E2E8F0] rounded-lg text-[14px]" />
+               <Input 
+                type="date" 
+                className="h-11 pl-10 border-[#E2E8F0] rounded-lg text-[14px]" 
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+               />
             </div>
          </div>
          <div className="space-y-2">
             <label className="text-[12px] font-bold text-[#64748B] uppercase tracking-wider">Time</label>
             <div className="relative">
                <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#94A3B8]" />
-               <Input type="time" className="h-11 pl-10 border-[#E2E8F0] rounded-lg text-[14px]" />
+               <Input 
+                type="time" 
+                className="h-11 pl-10 border-[#E2E8F0] rounded-lg text-[14px]" 
+                value={time}
+                onChange={(e) => setTime(e.target.value)}
+               />
             </div>
          </div>
       </div>
@@ -66,11 +94,16 @@ export function Step2Details({ onNext, onBack }: Step2Props) {
       <div className="grid grid-cols-2 gap-4">
          <div className="space-y-2">
             <label className="text-[12px] font-bold text-[#64748B] uppercase tracking-wider">Duration (min)</label>
-            <Input type="number" defaultValue={60} className="h-11 border-[#E2E8F0] rounded-lg text-[14px]" />
+            <Input 
+              type="number" 
+              className="h-11 border-[#E2E8F0] rounded-lg text-[14px]" 
+              value={duration}
+              onChange={(e) => setDuration(parseInt(e.target.value) || 0)}
+            />
          </div>
          <div className="space-y-2">
             <label className="text-[12px] font-bold text-[#64748B] uppercase tracking-wider">Platform</label>
-            <Select defaultValue="zoom">
+            <Select value={platform} onValueChange={(val) => setPlatform(val as any)}>
                <SelectTrigger className="h-11 border-[#E2E8F0] rounded-lg text-[14px]">
                   <SelectValue placeholder="Select Platform" />
                </SelectTrigger>
@@ -114,10 +147,11 @@ export function Step2Details({ onNext, onBack }: Step2Props) {
          <Button onClick={onBack} variant="ghost" className="text-[#64748B] font-bold px-0 hover:bg-transparent hover:text-[#0F172A]">
             ← Back
          </Button>
-         <Button onClick={() => onNext({})} className="h-10 px-6 bg-[#2563EB] hover:bg-blue-600 text-white rounded-lg font-bold text-[13px]">
+         <Button onClick={handleSubmit} className="h-10 px-6 bg-[#2563EB] hover:bg-blue-600 text-white rounded-lg font-bold text-[13px]">
             Next: Configure →
          </Button>
       </div>
     </div>
   );
 }
+

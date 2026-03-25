@@ -37,7 +37,7 @@ function FieldRow({ label, children, description, noBorder }: FieldRowProps) {
   );
 }
 
-export function ConfigTab() {
+export function ConfigTab({ agentName }: { agentName: string }) {
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500 pb-10">
       
@@ -55,7 +55,7 @@ export function ConfigTab() {
         
         <div className="space-y-1">
           <FieldRow label="Agent Name" description="External identification in audit logs">
-            <Input defaultValue="Task Generator Agent" className="h-9 w-[260px] text-[13px] border-slate-200 focus:ring-blue" />
+            <Input defaultValue={agentName} className="h-9 w-[260px] text-[13px] border-slate-200 focus:ring-blue" />
           </FieldRow>
           <FieldRow label="Max Concurrent Tasks" description="Limit processing load per agent instance">
             <Input type="number" defaultValue={5} className="h-9 w-20 text-[13px] border-slate-200 focus:ring-blue" />

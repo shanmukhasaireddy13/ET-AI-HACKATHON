@@ -20,15 +20,28 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
-
-const members = [
-  { id: "1", name: "John Doe", email: "john.doe@acme.inc", role: "Admin", status: "Active", joined: "Jan 14, 2026" },
-  { id: "2", name: "Sarah Smith", email: "sarah.s@acme.inc", role: "Manager", status: "Active", joined: "Feb 02, 2026" },
-  { id: "3", name: "Mike Johnson", email: "m.johnson@acme.inc", role: "Viewer", status: "Active", joined: "Mar 10, 2026" },
-  { id: "4", name: "Pending User", email: "new.hire@acme.inc", role: "Manager", status: "Invited", joined: "Pending" },
-];
+import { useState, useEffect } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 export function TeamPanel() {
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    async function fetchUser() {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+    }
+    fetchUser();
+  }, []);
+
+  const email = user?.email || "user@acme.com";
+  const name = user?.user_metadata?.full_name || email.split('@')[0];
+
+  const members = [
+    { id: "1", name: name, email: email, role: "Admin", status: "Active", joined: user ? new Date(user.created_at).toLocaleDateString() : "Just now" },
+  ];
+
   return (
     <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
       {/* Panel Header */}
@@ -38,7 +51,7 @@ export function TeamPanel() {
           <p className="text-[13px] text-slate-500 mt-1.5">Manage who has access to this workspace and their permission levels.</p>
         </div>
         <Badge variant="outline" className="w-fit bg-slate-50 text-slate-500 border-slate-200 py-1 px-3 rounded-full text-[11px] font-bold">
-          4 Members
+          1 Member
         </Badge>
       </div>
 
@@ -58,9 +71,9 @@ export function TeamPanel() {
             <SelectItem value="viewer">Viewer</SelectItem>
           </SelectContent>
         </Select>
-        <Button className="h-10 px-6 bg-blue hover:bg-blue-hover text-white text-[13px] font-bold gap-2 shadow-md shadow-blue/10 transition-all hover:-translate-y-0.5">
+        <Button disabled className="h-10 px-6 bg-slate-100 text-slate-400 text-[13px] font-bold gap-2 cursor-not-allowed">
           <UserPlus className="w-4 h-4" />
-          Send Invite
+          Send Invite (Admin Only)
         </Button>
       </div>
 
@@ -83,7 +96,7 @@ export function TeamPanel() {
                   <div className="flex items-center gap-3">
                     <Avatar className="w-8 h-8 border border-slate-100 shadow-sm">
                       <AvatarFallback className="bg-slate-100 text-slate-500 text-[10px] font-bold">
-                        {member.name.split(" ").map(n => n[0]).join("")}
+                        {member.name.split(" ").map((n: string) => n[0]).join("")}
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex flex-col leading-tight">
@@ -153,26 +166,6 @@ export function TeamPanel() {
         </table>
       </div>
 
-      {/* Pending Invites Dotted Section Suggestion */}
-      <div className="px-6 py-6 border-t-2 border-dashed border-slate-100 bg-slate-50/[0.02]">
-        <div className="flex items-center justify-between mb-4">
-          <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Pending Invites (1)</h4>
-        </div>
-        <div className="flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-white shadow-sm border-l-4 border-l-orange">
-           <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-orange-light/10 flex items-center justify-center">
-                 <Mail className="w-4 h-4 text-orange" />
-              </div>
-              <div className="flex flex-col leading-tight">
-                 <span className="text-[13px] font-bold text-slate-900">new.hire@acme.inc</span>
-                 <span className="text-[11px] text-slate-400 font-medium italic">Manager role — Invited 2h ago</span>
-              </div>
-           </div>
-           <Button variant="ghost" className="text-error hover:text-error hover:bg-error-bg/10 text-[12px] font-bold h-8">
-              Revoke
-           </Button>
-        </div>
-      </div>
     </div>
   );
 }

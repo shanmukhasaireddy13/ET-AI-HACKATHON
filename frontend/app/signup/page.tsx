@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { signup } from "@/app/actions/auth";
 
 // Zod Schema
 const signupSchema = z.object({
@@ -71,11 +72,22 @@ export default function SignupPage() {
 
   const onSubmit = async (data: SignupFormValues) => {
     setIsLoading(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    console.log("Signup Data:", data);
+    
+    const formData = new FormData();
+    formData.append('email', data.email);
+    formData.append('password', data.password);
+    formData.append('firstName', data.firstName);
+    formData.append('lastName', data.lastName);
+
+    const result = await signup(formData);
+
     setIsLoading(false);
-    setIsSuccess(true);
+    
+    if (result && !result.success) {
+      console.error(result.error);
+    } else {
+      setIsSuccess(true);
+    }
   };
 
   if (isSuccess) {

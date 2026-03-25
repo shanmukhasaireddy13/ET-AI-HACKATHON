@@ -12,21 +12,21 @@ interface TaskChip {
   day: number;
 }
 
-const MONTH_TASKS: TaskChip[] = [
-  { id: "1", title: "OAuth2 Flow", priority: "High", day: 12 },
-  { id: "2", title: "Db Rotation", priority: "High", day: 15 },
-  { id: "3", title: "FW Rules", priority: "Medium", day: 15 },
-  { id: "4", title: "Labels Final", priority: "Low", day: 21 },
-  { id: "5", title: "Websocket Leak", priority: "High", day: 24 },
-  { id: "6", title: "Inv. Summary", priority: "Medium", day: 28 },
-];
 
-export function TaskCalendar() {
+export function TaskCalendar({ tasks = [] }: { tasks?: any[] }) {
   const [view, setView] = useState<"month" | "week">("month");
 
-  // Simple grid for March 2026 (starts on Sunday)
-  const days = Array.from({ length: 31 }, (_, i) => i + 1);
-  const leadingDays = Array.from({ length: 0 }, (_, i) => 28 - i); // March 2026 starts on Sunday (0)
+  // Simple grid for current month
+  const today = new Date();
+  const currentMonth = today.getMonth();
+  const currentYear = today.getFullYear();
+  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+  const firstDayOfMonth = new Date(currentYear, currentMonth, 1).getDay();
+  
+  const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+  const leadingDays = Array.from({ length: firstDayOfMonth }, (_, i) => i);
+  
+  const monthName = today.toLocaleString('default', { month: 'long' });
 
   return (
     <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm animate-in zoom-in-95 duration-500">
@@ -41,7 +41,7 @@ export function TaskCalendar() {
               <ChevronRight className="w-4 h-4 text-slate-500" />
             </Button>
           </div>
-          <h2 className="text-[18px] font-bold text-slate-900 tracking-tight">March 2026</h2>
+          <h2 className="text-[18px] font-bold text-slate-900 tracking-tight">{monthName} {currentYear}</h2>
         </div>
 
         <div className="bg-slate-100 p-0.5 rounded-lg flex gap-1">
@@ -77,9 +77,17 @@ export function TaskCalendar() {
 
       {/* Grid Cells */}
       <div className="grid grid-cols-7">
+        {leadingDays.map((i) => (
+          <div key={`leading-${i}`} className="min-h-[140px] border-r border-b border-slate-100 bg-slate-50/30" />
+        ))}
         {days.map((day) => {
-          const isToday = day === 21; // Mock today as Mar 21
-          const dayTasks = MONTH_TASKS.filter((t) => t.day === day);
+          const isToday = day === today.getDate();
+          
+          const dayTasks = tasks.filter((t) => {
+            if (!t.dueDate || t.dueDate === "TBD") return false;
+            const taskDate = new Date(t.dueDate);
+            return taskDate.getDate() === day && taskDate.getMonth() === currentMonth && taskDate.getFullYear() === currentYear;
+          });
           
           return (
             <div 

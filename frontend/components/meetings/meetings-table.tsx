@@ -19,6 +19,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import Link from "next/link";
 import { 
   Tooltip,
   TooltipContent,
@@ -28,69 +29,7 @@ import {
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 
-const meetings = [
-  { 
-    id: "1", 
-    title: "Q2 Engineering Planning", 
-    project: "Backend Engine", 
-    participants: 6, 
-    date: "Mar 21, 2026", 
-    time: "10:30 AM", 
-    duration: 75, 
-    source: "Zoom", 
-    tasks: 12, 
-    status: "Complete",
-    agents: [
-      { name: "Summarizer", avatar: "/avatars/agent-1.png" },
-      { name: "Task Extractor", avatar: "/avatars/agent-2.png" },
-      { name: "Decision Logger", avatar: "/avatars/agent-3.png" },
-    ]
-  },
-  { 
-    id: "2", 
-    title: "Weekly Sync - Product", 
-    project: "Mobile App", 
-    participants: 4, 
-    date: "Mar 21, 2026", 
-    time: "09:00 AM", 
-    duration: 30, 
-    source: "Meet", 
-    tasks: 5, 
-    status: "Analysing",
-    progress: 60,
-    currentAgents: "3/5",
-    agents: [
-      { name: "Summarizer", avatar: "/avatars/agent-1.png" },
-      { name: "Task Extractor", avatar: "/avatars/agent-2.png" },
-    ]
-  },
-  { 
-    id: "3", 
-    title: "Project Alpha Kickoff", 
-    participants: 12, 
-    date: "Mar 20, 2026", 
-    time: "02:00 PM", 
-    duration: 60, 
-    source: "Teams", 
-    tasks: 0, 
-    status: "Failed",
-    reason: "Audio quality too low",
-    agents: []
-  },
-  { 
-    id: "4", 
-    title: "Design Review - Website Redesign", 
-    project: "Marketing", 
-    participants: 3, 
-    date: "Mar 20, 2026", 
-    time: "11:00 AM", 
-    duration: 45, 
-    source: "Manual", 
-    tasks: 0, 
-    status: "Queued",
-    agents: []
-  },
-];
+// Static meetings removed in favor of props
 
 const SourceIcon = ({ source }: { source: string }) => {
   switch (source) {
@@ -158,7 +97,11 @@ const StatusBadge = ({ status, progress, currentAgents }: { status: string, prog
   }
 };
 
-export function MeetingsTable() {
+interface MeetingsTableProps {
+  meetings: any[];
+}
+
+export function MeetingsTable({ meetings }: MeetingsTableProps) {
   const [selected, setSelected] = useState<string[]>([]);
 
   const toggleSelect = (id: string) => {
@@ -242,7 +185,7 @@ export function MeetingsTable() {
                 <div className="w-[80px]">
                    <TooltipProvider>
                       <div className="flex -space-x-[4px]">
-                         {meeting.agents.slice(0, 3).map((agent, i) => (
+                         {meeting.agents.slice(0, 3).map((agent: { name: string }, i: number) => (
                            <Tooltip key={i}>
                               <TooltipTrigger nativeButton={false}>
                                  <div className="w-5 h-5 rounded-full border border-white bg-slate-100 flex items-center justify-center overflow-hidden shrink-0 shadow-sm cursor-help">
@@ -276,9 +219,11 @@ export function MeetingsTable() {
                    <TooltipProvider>
                       <Tooltip>
                          <TooltipTrigger>
-                            <Button variant="outline" className="w-7 h-7 p-0 border-[#E2E8F0] text-[#64748B] hover:border-[#2563EB] hover:text-[#2563EB] rounded-[5px] transition-all">
-                               <ExternalLink className="w-3.5 h-3.5" />
-                            </Button>
+                            <Link href={`/dashboard/meetings/${meeting.id}`}>
+                               <Button variant="outline" className="w-7 h-7 p-0 border-[#E2E8F0] text-[#64748B] hover:border-[#2563EB] hover:text-[#2563EB] rounded-[5px] transition-all">
+                                  <ExternalLink className="w-3.5 h-3.5" />
+                               </Button>
+                            </Link>
                          </TooltipTrigger>
                          <TooltipContent className="text-[11px] font-bold">View Report</TooltipContent>
                       </Tooltip>

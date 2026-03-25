@@ -33,34 +33,44 @@ function StatCard({ label, value, icon, iconBg, iconColor, active }: StatCardPro
   );
 }
 
-export function ApprovalStatsStrip() {
+export function ApprovalStatsStrip({ 
+  pendingCount = 0, 
+  approvedCount = 0, 
+  rejectedCount = 0, 
+  avgTime = "14m" 
+}: { 
+  pendingCount?: number;
+  approvedCount?: number;
+  rejectedCount?: number;
+  avgTime?: string;
+}) {
   return (
     <div className="grid grid-cols-4 gap-3 mb-6">
       <StatCard 
         label="Pending" 
-        value="3" 
+        value={pendingCount.toString()} 
         icon={<ShieldAlert className="w-5 h-5" />} 
         iconBg="bg-orange-light" 
         iconColor="text-orange" 
-        active={true}
+        active={pendingCount > 0}
       />
       <StatCard 
-        label="Approved (7d)" 
-        value="31" 
+        label="Approved" 
+        value={approvedCount.toString()} 
         icon={<CheckCircle2 className="w-5 h-5" />} 
         iconBg="bg-success-bg" 
         iconColor="text-success" 
       />
       <StatCard 
-        label="Rejected (7d)" 
-        value="3" 
+        label="Rejected" 
+        value={rejectedCount.toString()} 
         icon={<XCircle className="w-5 h-5" />} 
         iconBg="bg-error-bg" 
         iconColor="text-error" 
       />
       <StatCard 
         label="Avg Decision" 
-        value="14m" 
+        value={avgTime} 
         icon={<Clock className="w-5 h-5" />} 
         iconBg="bg-slate-50" 
         iconColor="text-slate-500" 

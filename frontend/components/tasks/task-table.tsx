@@ -23,21 +23,14 @@ import {
 
 type GroupBy = "none" | "assignee" | "priority" | "status" | "meeting";
 
-export function TaskTable() {
+export function TaskTable({ tasks = [] }: { tasks?: any[] }) {
   const [groupBy, setGroupBy] = useState<GroupBy>("none");
   const [collapsedGroups, setCollapsedGroups] = useState<string[]>([]);
 
-  const TASKS = [
-    { id: "1", title: "Implement OAuth2 validation flow in API v3", priority: "High", status: "In Progress", source: "Security Sync", assignee: { name: "David Wu", avatar: "" }, dueDate: "Mar 22" },
-    { id: "2", title: "Rotate database credentials for staging", priority: "High", status: "In Progress", source: "Security Sync", assignee: { name: "David Wu", avatar: "" }, dueDate: "Today" },
-    { id: "3", title: "Update firewall rules for new VPC", priority: "Medium", status: "To Do", source: "Security Sync", assignee: { name: "Sarah Connor", avatar: "" }, dueDate: "Mar 25" },
-    { id: "4", title: "Finalize engineering roadmap labels", priority: "Low", status: "Done", source: "Ops Sync", assignee: { name: "Rahul Sharma", avatar: "" }, dueDate: "Mar 19" },
-  ];
-
   const groupData = () => {
-    if (groupBy === "none") return { "All Tasks": TASKS };
+    if (groupBy === "none") return { "All Tasks": tasks };
     
-    return TASKS.reduce((acc, task) => {
+    return (tasks as any[]).reduce((acc, task) => {
       const key = groupBy === "assignee" ? task.assignee.name : 
                  groupBy === "priority" ? task.priority :
                  groupBy === "status" ? task.status : task.source;
@@ -60,7 +53,7 @@ export function TaskTable() {
     <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm animate-in fade-in duration-500">
       {/* Table Toolbar */}
       <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/30">
-        <span className="text-[13px] font-bold text-slate-500 uppercase tracking-widest">{TASKS.length} total tasks</span>
+        <span className="text-[13px] font-bold text-slate-500 uppercase tracking-widest">{tasks.length} total tasks</span>
         
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">

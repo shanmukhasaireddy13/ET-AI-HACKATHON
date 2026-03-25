@@ -8,13 +8,14 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
+import requests
 from fastapi import FastAPI, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from main import create_empty_state
 from graph import build_graph
-from tools.database import save_meeting_results, get_meeting, _get_conn, init_db
+from tools.database import save_meeting_results, get_meeting, init_db, HEADERS, PROJECT_URL
 
 app = FastAPI(title="SIDD Agent Engine", version="3.0.0")
 
@@ -38,6 +39,7 @@ TOOL_REGISTRY = {
 class AgentProcessRequest(BaseModel):
     meeting_id: Optional[str] = None
     transcript: str
+    metadata: Optional[dict] = None
 
 
 class ApprovalDecisionRequest(BaseModel):
@@ -60,28 +62,22 @@ async def health_check():
 # ═══════════════════════════════════════════
 
 def run_workflow_sync(meeting_id: str, transcript: str):
-    """Runs the LangGraph workflow and saves the result."""
+    """Runs the LangGraph workflow. The audit node handles persistence."""
     graph = build_graph()
     state = create_empty_state(transcript)
     state["meeting_id"] = meeting_id
     
-    accumulated_state = dict(state)
-    for step_output in graph.stream(state):
-        for node_name, updates in step_output.items():
-            if isinstance(updates, dict):
-                accumulated_state.update(updates)
-                
     try:
-        conn = _get_conn()
-        conn.execute("DELETE FROM meetings WHERE id = ?", (meeting_id,))
-        conn.commit()
-        conn.close()
-        
-        save_meeting_results(accumulated_state)
+        accumulated_state = dict(state)
+        for step_output in graph.stream(state):
+            for node_name, updates in step_output.items():
+                if isinstance(updates, dict):
+                    accumulated_state.update(updates)
     except Exception as e:
         print(f"Failed to run workflow for {meeting_id}: {e}")
         import traceback
         traceback.print_exc()
+
 
 
 @app.post("/api/agent/process")
@@ -91,21 +87,44 @@ async def process_agent(req: AgentProcessRequest, background_tasks: BackgroundTa
     Accepts a meeting_id + transcript, kicks off the LangGraph pipeline in the background.
     """
     init_db()
-    meeting_id = req.meeting_id or f"mtg-{uuid.uuid4().hex[:8]}"
+    meeting_id = req.meeting_id or str(uuid.uuid4())
     
-    conn = _get_conn()
-    conn.execute(
-        "INSERT INTO meetings (id, transcript, summary, orchestrator_reasoning, dynamic_steps, completed_steps, created_at) VALUES (?,?,?,?,?,?,?)",
-        (meeting_id, req.transcript, "", "", "[]", "[]", datetime.now().isoformat())
+    # Extract metadata
+    meta = req.metadata or {}
+    title = meta.get("title") or f"Meeting {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+    platform = meta.get("platform") or "zoom"
+    duration = meta.get("duration") or 0
+    participants = meta.get("participants") or []
+
+    # Create initial record in Supabase
+    url = f"{PROJECT_URL}/rest/v1/meetings"
+    initial_data = {
+        "id": meeting_id,
+        "transcript": req.transcript,
+        "title": title,
+        "status": "processing",
+        "source": platform,
+        "duration": duration,
+        "participants": participants,
+        "created_at": datetime.now().isoformat()
+    }
+    requests.post(url, headers=HEADERS, json=initial_data)
+    
+    # NEW: Record Activity
+    from tools.database import record_activity
+    record_activity(
+        category="meeting",
+        action="ingested",
+        description=f"Meeting '{title}' uploaded and processing started.",
+        entity_id=meeting_id,
+        entity_type="meeting"
     )
-    conn.commit()
-    conn.close()
-    
+
     background_tasks.add_task(run_workflow_sync, meeting_id, req.transcript)
     
     return {
         "meeting_id": meeting_id,
-        "run_id": f"run-{uuid.uuid4().hex[:8]}",
+        "run_id": str(uuid.uuid4()),
         "status": "running",
         "current_stage": "orchestrator"
     }
@@ -139,14 +158,14 @@ async def chat_endpoint(req: ChatRequest):
             media_type="text/plain"
         )
     
-    meeting_id = f"mtg-{uuid.uuid4().hex[:8]}"
+    meeting_id = str(uuid.uuid4())
     
     def emit(event_type, **kwargs):
         return json.dumps({"type": event_type, **kwargs}) + "\n"
     
     def generate():
         try:
-            yield emit("status", message=f"Starting agent analysis for meeting {meeting_id}...")
+            yield emit("status", message=f"Starting 100% Agentic Analysis for meeting {meeting_id}...")
             
             graph = build_graph()
             state = create_empty_state(transcript)
@@ -155,58 +174,49 @@ async def chat_endpoint(req: ChatRequest):
             accumulated_state = dict(state)
             for step_output in graph.stream(state):
                 for node_name, updates in step_output.items():
-                    yield emit("node_start", node=node_name)
+                    # Map node names to user-friendly stages
+                    stage_map = {
+                        "planner": "Planning Strategy",
+                        "brain": "Reasoning & Goal Execution",
+                        "executor": "Executing Tool Calls",
+                        "monitor": "Reviewing Results",
+                        "audit": "Finalizing Analysis"
+                    }
+                    yield emit("node_start", node=node_name, stage=stage_map.get(node_name, node_name))
+                    
                     if isinstance(updates, dict):
                         accumulated_state.update(updates)
+                        
+                        # Special: If Brain has a new thought, emit it immediately
+                        if node_name == "brain" and "orchestrator_reasoning" in updates:
+                            yield emit("thought", content=updates["orchestrator_reasoning"])
+                            
+                        # Special: If Executor has new results, emit them
+                        if node_name == "executor" and "execution_results" in updates:
+                            yield emit("execution", data=updates["execution_results"][-1])
+                            
                     yield emit("node_complete", node=node_name)
             
-            # Save results
+            # Save final results
             try:
-                conn = _get_conn()
-                conn.execute("DELETE FROM meetings WHERE id = ?", (meeting_id,))
-                conn.commit()
-                conn.close()
                 save_meeting_results(accumulated_state)
             except Exception as e:
-                yield emit("warning", message=f"Could not save results — {e}")
+                yield emit("warning", message=f"Could not save final results — {e}")
             
-            # Emit summary
-            summary = accumulated_state.get("meeting_summary", "")
-            if summary:
-                yield emit("summary", content=summary)
+            # Emit structured outputs for the frontend to update various tabs
+            outputs = {
+                "summary": accumulated_state.get("meeting_summary", ""),
+                "tasks": accumulated_state.get("assigned_tasks", []),
+                "events": accumulated_state.get("scheduled_events", []),
+                "bugs": accumulated_state.get("bug_tickets", []),
+                "followups": accumulated_state.get("followup_items", []),
+                "approvals": accumulated_state.get("pending_approvals", []),
+                "reasoning": accumulated_state.get("agent_reasoning", [])
+            }
             
-            # Emit tasks
-            tasks = accumulated_state.get("assigned_tasks", [])
-            if tasks:
-                yield emit("tasks", data=tasks)
-            
-            # Emit scheduled events
-            events = accumulated_state.get("scheduled_events", [])
-            if events:
-                yield emit("events", data=events)
-            
-            # Emit bug tickets
-            bugs = accumulated_state.get("bug_tickets", [])
-            if bugs:
-                yield emit("bugs", data=bugs)
-            
-            # Emit follow-up items
-            followups = accumulated_state.get("followup_items", [])
-            if followups:
-                yield emit("followups", data=followups)
-            
-            # Emit pending approvals
-            approvals = accumulated_state.get("pending_approvals", [])
-            if approvals:
-                safe_approvals = []
-                for a in approvals:
-                    safe_approvals.append({k: str(v) for k, v in a.items()})
-                yield emit("approvals", data=safe_approvals)
-            
-            # Emit agent reasoning
-            reasoning = accumulated_state.get("agent_reasoning", [])
-            if reasoning:
-                yield emit("reasoning", data=reasoning)
+            for key, data in outputs.items():
+                if data:
+                    yield emit(key, data=data if key != "summary" else None, content=data if key == "summary" else None)
             
             yield emit("done", meeting_id=meeting_id)
             
@@ -214,7 +224,7 @@ async def chat_endpoint(req: ChatRequest):
             import traceback
             yield emit("error", message=str(e))
             traceback.print_exc()
-    
+
     return StreamingResponse(generate(), media_type="text/plain; charset=utf-8")
 
 
@@ -238,21 +248,21 @@ async def audit_logs(meeting_id: str):
         return []
         
     logs = []
-    for idx, l in enumerate(m.get("audit_log", [])):
-        entry = l["entry"]
+    # In the new architecture, we mainly pull from agent_execution_steps if available,
+    # or fall back to the audit_log list in the meeting record.
+    raw_logs = m.get("audit_log", [])
+    for l in raw_logs:
+        entry = l if isinstance(l, str) else str(l)
         agent = "System"
-        if "ORCHESTRATOR" in entry: agent = "Orchestrator"
-        elif "DYNAMIC_AGENT" in entry:
-            import re
-            match = re.search(r'DYNAMIC_AGENT \[(.+?)\]', entry)
-            agent = match.group(1) if match else "DynamicAgent"
+        
+        if "PLANNER" in entry: agent = "Planner"
+        elif "BRAIN" in entry: agent = "SIDD Brain"
         elif "EXECUTOR" in entry: agent = "Executor"
         elif "MONITOR" in entry: agent = "Monitor"
-        elif "RECOVERY" in entry: agent = "Recovery"
-        elif "AUDIT" in entry: agent = "Audit"
+        elif "AUDIT" in entry: agent = "Auditor"
             
         logs.append({
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now().isoformat(), # Ideally we'd parse from log if available
             "agent": agent,
             "action": entry,
             "details": {}

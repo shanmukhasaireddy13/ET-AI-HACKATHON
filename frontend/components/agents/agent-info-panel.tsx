@@ -2,6 +2,8 @@
 
 import { ShieldCheck, Info, Link as LinkIcon, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 interface DetailRowProps {
   label: string;
@@ -26,7 +28,21 @@ function DetailRow({ label, value, status }: DetailRowProps) {
   );
 }
 
-export function AgentInfoPanel() {
+export function AgentInfoPanel({ agent }: { agent: any }) {
+  const [integrations, setIntegrations] = useState<any[]>([]);
+  const supabase = createClient();
+
+  useEffect(() => {
+    async function fetchIntegrations() {
+      const { data } = await supabase.from('integrations').select('*');
+      if (data) setIntegrations(data);
+    }
+    fetchIntegrations();
+  }, []);
+
+  const jiraConnected = integrations.find(i => i.service_name.toLowerCase().includes('jira'))?.status === 'connected';
+  const slackConnected = integrations.find(i => i.service_name.toLowerCase().includes('slack'))?.status === 'connected';
+
   return (
     <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm sticky top-[92px]">
       <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2">
@@ -36,11 +52,11 @@ export function AgentInfoPanel() {
 
       <div className="py-2">
         <DetailRow label="Status" value="Active" status="success" />
-        <DetailRow label="Type" value="Task Generator" />
-        <DetailRow label="Model" value="Claude 3.5 Sonnet" />
-        <DetailRow label="Version" value="v2.1.4" />
-        <DetailRow label="Created" value="Jan 14, 2026" />
-        <DetailRow label="Tools" value="Jira API, Email" />
+        <DetailRow label="Type" value={agent.type || "AI Agent"} />
+        <DetailRow label="Model" value={agent.metrics?.model || "Claude 3.5 Sonnet"} />
+        <DetailRow label="Version" value={agent.metrics?.version || "v2.1.4"} />
+        <DetailRow label="Created" value={agent.metrics?.created || "Jan 14, 2026"} />
+        <DetailRow label="Tools" value={agent.metrics?.tools || "Jira API, Email"} />
         <DetailRow label="Permissions" value="Read+Write" />
         <DetailRow label="Approval" value="High Priority+" />
       </div>
@@ -50,17 +66,29 @@ export function AgentInfoPanel() {
         <div className="space-y-3">
           <div className="flex items-center justify-between group cursor-pointer">
             <div className="flex items-center gap-2.5">
-              <div className="w-6 h-6 rounded bg-blue-light flex items-center justify-center text-[10px] font-bold text-blue">J</div>
-              <span className="text-[13px] font-semibold text-slate-700 group-hover:text-blue transition-colors">Jira Enterprise</span>
+              <div className={cn(
+                "w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold",
+                jiraConnected ? "bg-blue-light text-blue" : "bg-slate-100 text-slate-400"
+              )}>J</div>
+              <span className={cn(
+                "text-[13px] font-semibold transition-colors",
+                jiraConnected ? "text-slate-700 group-hover:text-blue" : "text-slate-400"
+              )}>Jira Enterprise</span>
             </div>
-            <ExternalLink className="w-3.5 h-3.5 text-slate-300 group-hover:text-blue transition-all" />
+            {jiraConnected && <ExternalLink className="w-3.5 h-3.5 text-slate-300 group-hover:text-blue transition-all" />}
           </div>
           <div className="flex items-center justify-between group cursor-pointer">
             <div className="flex items-center gap-2.5">
-              <div className="w-6 h-6 rounded bg-error-bg flex items-center justify-center text-[10px] font-bold text-error">S</div>
-              <span className="text-[13px] font-semibold text-slate-700 group-hover:text-blue transition-colors">Slack Workspace</span>
+              <div className={cn(
+                "w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold",
+                slackConnected ? "bg-error-bg text-error" : "bg-slate-100 text-slate-400"
+              )}>S</div>
+              <span className={cn(
+                "text-[13px] font-semibold transition-colors",
+                slackConnected ? "text-slate-700 group-hover:text-blue" : "text-slate-400"
+              )}>Slack Workspace</span>
             </div>
-            <ExternalLink className="w-3.5 h-3.5 text-slate-300 group-hover:text-blue transition-all" />
+            {slackConnected && <ExternalLink className="w-3.5 h-3.5 text-slate-300 group-hover:text-blue transition-all" />}
           </div>
         </div>
       </div>

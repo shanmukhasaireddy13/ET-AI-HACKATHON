@@ -10,6 +10,7 @@ import { TypingQuote } from "@/components/ui/typing-quote";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { login } from "@/app/actions/auth";
 
 // Zod Schema
 const loginSchema = z.object({
@@ -62,11 +63,16 @@ export default function LoginPage() {
     setIsLoading(true);
     setLoginError(false);
     
-    // Simulate API call & force error to show the error banner UI
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    console.log("Login Data:", data);
-    setLoginError(true);
-    setIsLoading(false);
+    const formData = new FormData();
+    formData.append('email', data.email);
+    formData.append('password', data.password);
+
+    const result = await login(formData);
+    
+    if (result && !result.success) {
+      setLoginError(true);
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -171,7 +177,7 @@ export default function LoginPage() {
                 <Checkbox id="rememberMe" className="data-[state=checked]:bg-blue data-[state=checked]:border-blue" {...register("rememberMe")} />
                 <label htmlFor="rememberMe" className="text-[13px] text-muted-text cursor-pointer select-none">Remember me for 30 days</label>
               </div>
-              <Link href="/reset-password" className="text-[13px] text-blue hover:underline">Forgot password?</Link>
+              <Link href="/forgot-password" className="text-[13px] text-blue hover:underline">Forgot password?</Link>
             </div>
 
             <Button 
