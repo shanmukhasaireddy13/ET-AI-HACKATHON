@@ -3,50 +3,7 @@ import { ChevronDown, ChevronRight, Copy, CheckCircle2, AlertCircle, Info, Clock
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 
-const LOGS = [
-  { 
-    id: "l1", 
-    level: "Success", 
-    timestamp: "Mar 21 · 12:15:32", 
-    action: "Task Generator Agent successfully processed 14 tasks from Engineering Planning Q2 transcript.",
-    input: "Engineering Planning Q2 Kickoff transcript (4,218 words)",
-    output: "14 Tasks Generated, 6 Decisions Extracted, 2 Follow-ups",
-    duration: "2.14s",
-    status: "Complete"
-  },
-  { 
-    id: "l2", 
-    level: "Info", 
-    timestamp: "Mar 21 · 11:45:10", 
-    action: "Agent initialized and connected to context memory store.",
-    input: "System initialization prompt v2.1.4",
-    output: "Context Loaded (3.2MB data)",
-    duration: "0.85s",
-    status: "Active"
-  },
-  { 
-    id: "l3", 
-    level: "Warning", 
-    timestamp: "Mar 21 · 11:20:05", 
-    action: "Partial retry triggered: Jira API rate limit approaching.",
-    input: "Sync Request (5 objects)",
-    output: "2 Synced, 3 Queued",
-    duration: "4.21s",
-    status: "Retrying"
-  },
-  { 
-    id: "l4", 
-    level: "Error", 
-    timestamp: "Mar 21 · 10:50:44", 
-    action: "Failed to parse speaker 'Rahul Sharma' due to high background noise.",
-    input: "Audio segment [34:22 - 34:28]",
-    output: "None (Confidence < 40%)",
-    duration: "1.12s",
-    status: "Failed"
-  }
-];
-
-export function ActivityLogTab() {
+export function ActivityLogTab({ logs = [] }: { logs?: any[] }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   return (
@@ -78,7 +35,7 @@ export function ActivityLogTab() {
             </tr>
           </thead>
           <tbody>
-            {LOGS.map((log) => (
+            {logs.length > 0 ? logs.map((log) => (
               <React.Fragment key={log.id}>
                 <tr 
                   onClick={() => setExpandedId(expandedId === log.id ? null : log.id)}
@@ -134,7 +91,7 @@ export function ActivityLogTab() {
                         <div className="space-y-2">
                           <label className="text-[11px] font-bold text-slate-400 uppercase tracking-widest pl-1">Agent Output</label>
                           <div className="relative group/code">
-                            <pre className="p-3 bg-white border border-slate-200 rounded-lg text-[12px] font-mono text-slate-600 overflow-x-auto">
+                            <pre className="p-3 bg-white border border-slate-200 rounded-lg text-[12px] font-mono text-slate-600 overflow-x-auto whitespace-pre-wrap">
                               {log.output}
                             </pre>
                             <button className="absolute top-2 right-2 p-1.5 bg-slate-50 hover:bg-blue-light text-slate-400 hover:text-blue rounded border border-slate-200 opacity-0 group-hover/code:opacity-100 transition-all shadow-sm">
@@ -147,7 +104,13 @@ export function ActivityLogTab() {
                   </tr>
                 )}
               </React.Fragment>
-            ))}
+            )) : (
+              <tr>
+                <td colSpan={6} className="text-center py-20 text-slate-400 text-sm">
+                  No activity logs found for this agent.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
 

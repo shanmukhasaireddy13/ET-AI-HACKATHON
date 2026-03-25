@@ -1,7 +1,9 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { Activity, Bot, User, AlertCircle, Plug } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { createClient } from "@/lib/supabase/client";
 
 interface StatCardProps {
   label: string;
@@ -28,8 +30,6 @@ function StatCard({ label, value, icon, iconBg, iconColor, valueColor }: StatCar
           {label}
         </div>
       </div>
-      
-      {/* Subtle background decoration */}
       <div className={cn("absolute -right-2 -bottom-2 opacity-[0.03] group-hover:opacity-[0.06] transition-opacity duration-700", iconColor)}>
         {icon}
       </div>
@@ -38,32 +38,61 @@ function StatCard({ label, value, icon, iconBg, iconColor, valueColor }: StatCar
 }
 
 export function ActivityStats() {
+  const [stats, setStats] = useState({
+    total: 0,
+    agent: 0,
+    manager: 0,
+    errors: 0,
+    integrations: 0
+  });
+  const supabase = createClient();
+
+  useEffect(() => {
+    async function fetchStats() {
+      const [mCount, tCount, aCount, iCount] = await Promise.all([
+        supabase.from('meetings').select('*', { count: 'exact', head: true }),
+        supabase.from('tasks').select('*', { count: 'exact', head: true }),
+        supabase.from('approvals').select('*', { count: 'exact', head: true }),
+        supabase.from('integrations').select('*', { count: 'exact', head: true })
+      ]);
+
+      setStats({
+        total: (mCount.count || 0) + (tCount.count || 0) + (aCount.count || 0),
+        agent: (mCount.count || 0) + (tCount.count || 0),
+        manager: aCount.count || 0,
+        errors: 0, // Placeholder for actual error logging table if added
+        integrations: iCount.count || 0
+      });
+    }
+    fetchStats();
+  }, []);
+
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
       <StatCard 
-        label="Total Events (7d)" 
-        value="1,204" 
+        label="Total Events" 
+        value={stats.total.toLocaleString()} 
         icon={<Activity />} 
         iconBg="bg-blue-light/10"
         iconColor="text-blue" 
       />
       <StatCard 
         label="Agent Actions" 
-        value="1,142" 
+        value={stats.agent.toLocaleString()} 
         icon={<Bot />} 
         iconBg="bg-green-light/10"
         iconColor="text-green" 
       />
       <StatCard 
         label="Manager Actions" 
-        value="48" 
+        value={stats.manager.toLocaleString()} 
         icon={<User />} 
         iconBg="bg-blue-light/10"
         iconColor="text-blue" 
       />
       <StatCard 
         label="Critical Errors" 
-        value="7" 
+        value="0" 
         icon={<AlertCircle />} 
         iconBg="bg-error-bg/10"
         iconColor="text-error"
@@ -71,7 +100,7 @@ export function ActivityStats() {
       />
       <StatCard 
         label="Integrations" 
-        value="214" 
+        value={stats.integrations.toString()} 
         icon={<Plug />} 
         iconBg="bg-slate-50"
         iconColor="text-slate-400" 

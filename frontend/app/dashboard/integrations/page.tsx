@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   Key, 
   Search, 
@@ -28,14 +28,28 @@ import { SlackConfigDrawer } from "@/components/integrations/slack-config-drawer
 import { EmailConfigDrawer } from "@/components/integrations/email-config-drawer";
 import { ConnectModal } from "@/components/integrations/connect-modal";
 import { DisconnectAlert } from "@/components/integrations/disconnect-alert";
+import { createClient } from "@/lib/supabase/client";
 
 export default function IntegrationsPage() {
+  const [integrations, setIntegrations] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isJiraOpen, setIsJiraOpen] = useState(false);
   const [isSlackOpen, setIsSlackOpen] = useState(false);
   const [isEmailOpen, setIsEmailOpen] = useState(false);
   const [isConnectOpen, setIsConnectOpen] = useState(false);
   const [isDisconnectOpen, setIsDisconnectOpen] = useState(false);
   const [selectedIntegration, setSelectedIntegration] = useState<any>(null);
+  const supabase = createClient();
+
+  const fetchIntegrations = async () => {
+    const { data, error } = await supabase.from('integrations').select('*');
+    if (data) setIntegrations(data);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchIntegrations();
+  }, []);
 
   const handleConnect = (name: string, icon: React.ReactNode) => {
     setSelectedIntegration({ name, icon });
@@ -43,13 +57,51 @@ export default function IntegrationsPage() {
   };
 
   const handleDisconnect = (name: string) => {
-    setSelectedIntegration({ name, icon: null });
+    const existing = integrations.find(i => i.name === name);
+    setSelectedIntegration({ name, icon: null, id: existing?.id });
     setIsDisconnectOpen(true);
   };
 
+  const confirmConnect = async () => {
+    const { error } = await supabase.from('integrations').upsert({
+      name: selectedIntegration.name,
+      status: 'connected',
+      last_sync: new Date().toISOString()
+    }, { onConflict: 'name' });
+    
+    if (!error) fetchIntegrations();
+    setIsConnectOpen(false);
+  };
+
+  const confirmDisconnect = async () => {
+    const { error } = await supabase.from('integrations').update({
+       status: 'available'
+    }).eq('name', selectedIntegration.name);
+
+    if (!error) fetchIntegrations();
+    setIsDisconnectOpen(false);
+  };
+
   const JiraIcon = <svg viewBox="0 0 24 24" className="w-6 h-6 text-blue fill-current"><path d="M11.53 2c0 2.399 1.944 4.343 4.342 4.343h4.343V2h-8.685zm0 10.114c0 2.4 1.944 4.343 4.342 4.343h4.343v-4.343h-8.685zm-1.416-5.057c0 2.4-1.943 4.343-4.342 4.343H1.43V7.057h8.685zm0 10.114c0 2.4-1.943 4.343-4.342 4.343H1.43v-4.343h8.685z"/></svg>;
-  
   const SlackIcon = <svg viewBox="0 0 24 24" className="w-6 h-6 text-[#4A154B] fill-current"><path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.527 2.527 0 0 1 2.521 2.522v2.52h-2.521zM8.834 6.313a2.527 2.527 0 0 1 2.521 2.521 2.527 2.527 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zM18.958 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.527 2.527 0 0 1-2.52 2.52h-2.522v-2.52zM17.688 8.834a2.527 2.527 0 0 1-2.521 2.521 2.527 2.527 0 0 1-2.521-2.521V2.522A2.528 2.528 0 0 1 15.167 0a2.528 2.528 0 0 1 2.521 2.522v6.312zM15.167 18.958a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521 2.527 2.527 0 0 1-2.521-2.522v-2.52h2.521zM15.167 17.688a2.527 2.527 0 0 1-2.521-2.521 2.527 2.527 0 0 1 2.521-2.521h6.312A2.528 2.528 0 0 1 24 15.167a2.528 2.528 0 0 1-2.522 2.521h-6.312z"/></svg>;
+
+  const connectedList = integrations.filter(i => i.status === 'connected');
+  const availableOptions = [
+    { name: "Jira", desc: "Task tracking, project management & issue sync", icon: JiraIcon },
+    { name: "Slack", desc: "Team notifications, standups & agent chat", icon: SlackIcon },
+    { name: "GitHub", desc: "Link tasks to pull requests and issues", icon: <Github className="w-6 h-6 text-slate-900" /> },
+    { name: "Email/SMTP", desc: "Professional email summaries and task alerts", icon: <Mail className="w-6 h-6 text-blue" /> },
+    { name: "Notion", desc: "Sync meeting summaries and decisions", icon: <FileText className="w-6 h-6 text-slate-900" /> },
+    { name: "Linear", desc: "Create and sync high-performance issues", icon: <Layers className="w-6 h-6 text-blue" /> },
+  ];
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-20 bg-dash-bg min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-dash-bg animate-in fade-in duration-700">
@@ -68,45 +120,36 @@ export default function IntegrationsPage() {
         </div>
 
         {/* Section 1: Connected */}
-        <div className="space-y-4">
-           <div className="flex items-center gap-2.5">
-              <h2 className="text-[14px] font-bold text-slate-900 tracking-tight">Connected</h2>
-              <Badge className="bg-green-light text-green border-green-border text-[11px] font-bold px-2 py-0.5 rounded-full border">3 connected</Badge>
-           </div>
-           
-           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <IntegrationCard 
-                 name="Jira"
-                 description="Task tracking, project management & issue sync"
-                 icon={JiraIcon}
-                 status="connected"
-                 lastSync="3 min ago"
-                 stats={[{ label: "tasks pushed", value: "214" }, { label: "success", value: "98.1%" }]}
-                 onConfigure={() => setIsJiraOpen(true)}
-                 onDisconnect={() => handleDisconnect("Jira")}
-              />
-              <IntegrationCard 
-                 name="Slack"
-                 description="Team notifications, standups & agent chat"
-                 icon={SlackIcon}
-                 status="connected"
-                 lastSync="12 min ago"
-                 stats={[{ label: "pings sent", value: "1.2k" }, { label: "response", value: "4s" }]}
-                 onConfigure={() => setIsSlackOpen(true)}
-                 onDisconnect={() => handleDisconnect("Slack")}
-              />
-              <IntegrationCard 
-                 name="Email/SMTP"
-                 description="Professional email summaries and task alerts"
-                 icon={<Mail className="w-6 h-6 text-blue" />}
-                 status="connected"
-                 lastSync="1 hour ago"
-                 stats={[{ label: "delivered", value: "842" }, { label: "open rate", value: "72%" }]}
-                 onConfigure={() => setIsEmailOpen(true)}
-                 onDisconnect={() => handleDisconnect("Email/SMTP")}
-              />
-           </div>
-        </div>
+        {connectedList.length > 0 && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2.5">
+                <h2 className="text-[14px] font-bold text-slate-900 tracking-tight">Connected</h2>
+                <Badge className="bg-green-light text-green border-green-border text-[11px] font-bold px-2 py-0.5 rounded-full border">{connectedList.length} connected</Badge>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {connectedList.map(item => {
+                  const base = availableOptions.find(o => o.name === item.name) || { icon: <Zap /> };
+                  return (
+                    <IntegrationCard 
+                      key={item.id}
+                      name={item.name}
+                      description={item.description || "Active automation link"}
+                      icon={base.icon}
+                      status="connected"
+                      lastSync={item.last_sync ? "Just now" : "Never"}
+                      onConfigure={() => {
+                        if (item.name === "Jira") setIsJiraOpen(true);
+                        if (item.name === "Slack") setIsSlackOpen(true);
+                        if (item.name === "Email/SMTP") setIsEmailOpen(true);
+                      }}
+                      onDisconnect={() => handleDisconnect(item.name)}
+                    />
+                  );
+                })}
+            </div>
+          </div>
+        )}
 
         {/* Section 2: Available */}
         <div className="space-y-4">
@@ -119,42 +162,14 @@ export default function IntegrationsPage() {
            </div>
 
            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {[
-                { name: "GitHub", desc: "Link tasks to pull requests and issues", icon: <Github className="w-6 h-6 text-slate-900" />, tags: ["Create tickets", "Sync status"] },
-                { name: "Notion", desc: "Sync meeting summaries and decisions", icon: <FileText className="w-6 h-6 text-slate-900" />, tags: ["Doc sync", "Auto-archive"] },
-                { name: "Linear", desc: "Create and sync high-performance issues", icon: <Layers className="w-6 h-6 text-blue" />, tags: ["Sync status", "Assign tasks"] },
-                { name: "Asana", desc: "Push tasks to Asana projects", icon: <CheckSquare className="w-6 h-6 text-error" />, tags: ["Project sync"] },
-                { name: "Google Calendar", desc: "Auto-import meetings from calendar", icon: <Calendar className="w-6 h-6 text-blue" />, tags: ["Import", "Auto-join"] },
-                { name: "Microsoft Teams", desc: "Send notifications via Teams", icon: <Users className="w-6 h-6 text-blue" />, tags: ["Notify", "Meet"] },
-              ].map((item, i) => (
+              {availableOptions.filter(o => !connectedList.find(c => c.name === o.name)).map((item, i) => (
                 <IntegrationCard 
                    key={i}
                    name={item.name}
-                   description={item.desc}
+                   description={item.desc || ""}
                    icon={item.icon}
                    status="available"
-                   tags={item.tags}
                    onConnect={() => handleConnect(item.name, item.icon)}
-                />
-              ))}
-           </div>
-        </div>
-
-        {/* Section 3: Coming Soon */}
-        <div className="space-y-4">
-           <h2 className="text-[14px] font-bold text-slate-400 tracking-tight">Coming Soon</h2>
-           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {[
-                { name: "Salesforce", desc: "Connect meetings to CRM opportunities", icon: <Cloud className="w-6 h-6 text-blue" /> },
-                { name: "HubSpot", desc: "Link action items to contact records", icon: <Briefcase className="w-6 h-6 text-orange" /> },
-                { name: "Zapier", desc: "Automate anything with 5000+ apps", icon: <Zap className="w-6 h-6 text-orange" /> },
-              ].map((item, i) => (
-                <IntegrationCard 
-                   key={i}
-                   name={item.name}
-                   description={item.desc}
-                   icon={item.icon}
-                   status="coming_soon"
                 />
               ))}
            </div>
@@ -169,14 +184,14 @@ export default function IntegrationsPage() {
           open={isConnectOpen} 
           onOpenChange={setIsConnectOpen} 
           integration={selectedIntegration}
-          onSuccess={() => console.log("Account successfully linked!")}
+          onSuccess={confirmConnect}
         />
 
         <DisconnectAlert 
           open={isDisconnectOpen}
           onOpenChange={setIsDisconnectOpen}
           integrationName={selectedIntegration?.name}
-          onConfirm={() => console.log("Account disconnected.")}
+          onConfirm={confirmDisconnect}
         />
       </div>
     </div>

@@ -3,99 +3,99 @@ from state import AgentState
 from utils.llm import call_gemini_safe
 from datetime import datetime
 
-ORCHESTRATOR_PROMPT = """You are the master orchestrator of a dynamic multi-agent system.
-Your job is to analyze input (a meeting transcript, conversation, or request) and dynamically create a sequence of tailored workflow steps for specialized agents to execute.
+PLANNER_PROMPT = """You are the SIDD Strategic Planner. You have received structured data extracted by specialized AI agents from a meeting transcript. Your job is to create a comprehensive execution plan.
 
-Input:
-\"\"\"{transcript}\"\"\"
+═══ MEETING SUMMARY ═══
+{summary}
 
-═══ AVAILABLE TOOLS (what you can instruct agents to use) ═══
+═══ EXTRACTED TASKS ({tasks_count}) ═══
+{tasks}
 
-1. create_jira_ticket(title: str, description: str)
-   → Creates a real Jira ticket. Use when tasks, bugs, or action items need tracking.
+═══ EXTRACTED EVENTS ({events_count}) ═══
+{events}
 
-2. send_slack_message(channel: str, message: str)
-   → Sends a Slack notification. Use for alerts, updates, or follow-up reminders.
+═══ EXTRACTED BUGS ({bugs_count}) ═══
+{bugs}
 
-3. schedule_calendar_event(title: str, time: str, attendees: list)
-   → Schedules a calendar meeting/event. Use when follow-up meetings are needed.
+═══ EXTRACTED FOLLOW-UPS ({followups_count}) ═══
+{followups}
 
-═══ AVAILABLE DATA OUTPUTS (what agents can produce) ═══
+═══ DECISIONS MADE ({decisions_count}) ═══
+{decisions}
 
-Agents can populate these structured outputs:
-- meeting_summary: A text summary of the input
-- assigned_tasks: List of {{\"task\": "...", \"assignee\": "...", \"priority\": "high/medium/low"}}
-- scheduled_events: List of {{\"title\": "...", \"time\": "...", \"attendees\": [...]}}
-- bug_tickets: List of {{\"title\": "...", \"severity\": "...", \"description\": "..."}}
-- followup_items: List of {{\"item\": "...", \"owner\": "..."}}
-- execution_queue: List of tool calls to execute: {{\"tool\": "<tool_name>", \"args\": {{...}}, \"source_agent\": "<role>"}}
+═══ YOUR MISSION ═══
+Create a strategic execution directive that:
+1. Prioritizes critical bugs and high-priority tasks first
+2. Schedules events and sets up follow-ups
+3. Ensures all stakeholders are notified via Slack
+4. Creates Jira tickets for tasks and bugs that need tracking
 
-═══ YOUR TASK ═══
-
-Analyze the input and create a workflow plan. For each step, define:
-- A role name for the agent
-- A detailed auto_prompt instruction telling the agent EXACTLY what to extract/produce
-- In the auto_prompt, tell the agent WHICH data outputs to populate and WHICH tools to queue
-
-IMPORTANT: Return ONLY a valid JSON object in this exact format, no other text:
+Return ONLY valid JSON:
 {{
-    "steps": [
-        {{
-            "role": "AgentRoleName", 
-            "auto_prompt": "Detailed instruction including which outputs to populate and which tools to call with what arguments"
-        }}
-    ],
-    "reasoning": "Brief explanation of why you designed this workflow."
+    "directive": "A comprehensive strategic plan describing what the autonomous agent should execute, in what order, and why.",
+    "reasoning": "Why this plan is optimal.",
+    "priority_order": ["item1", "item2"],
+    "total_actions_expected": 5
 }}
-
-Rules:
-- Create as many steps as needed based on the input content
-- Each auto_prompt MUST be extremely specific about the transcript content  
-- If tasks are found, include a step that queues create_jira_ticket tool calls
-- If meetings/events are mentioned, include a step that queues schedule_calendar_event
-- If notifications are needed, include a step that queues send_slack_message
-- Always include at least a summarizer step
-- Tool calls in execution_queue MUST use format: {{"tool": "<name>", "args": {{...}}, "source_agent": "<role>"}}
 """
 
 def orchestrator_node(state: AgentState) -> dict:
     """
-    🧠 ORCHESTRATOR 
-    Analyzes the meeting transcript and DYNAMICALLY builds a sequence of steps with tailored auto-prompts.
-    Now includes full awareness of available tools so the LLM can design actionable workflows.
+    🏁 STRATEGIC PLANNER
+    Reads all extracted data from Understanding phase and creates a unified execution plan.
     """
-    print("\n" + "=" * 60)
-    print("🧠 ORCHESTRATOR: Generating dynamic auto-prompts...")
-    print("=" * 60)
-    
-    transcript = state.get("meeting_transcript", "")
-    
-    # ═══ CALL LLM ═══
-    prompt = ORCHESTRATOR_PROMPT.format(transcript=transcript)
-    
-    result = call_gemini_safe(
-        prompt, 
-        fallback={
-            "steps": [{"role": "Summarizer", "auto_prompt": "Summarize the transcript and populate meeting_summary."}], 
-            "reasoning": "Fallback to basic summary."
-        }
+    print("\n" + "🏁" * 30)
+    print("🏁 STRATEGIC PLANNER: Creating execution directive from extracted data...")
+    print("🏁" * 30)
+
+    tasks = state.get("assigned_tasks", [])
+    events = state.get("scheduled_events", [])
+    bugs = state.get("bug_tickets", [])
+    followups = state.get("followup_items", [])
+    summary = state.get("meeting_summary", "")
+    decisions = state.get("decisions", [])
+
+    prompt = PLANNER_PROMPT.format(
+        summary=summary or "No summary available.",
+        tasks=json.dumps(tasks, indent=2) if tasks else "No tasks extracted.",
+        tasks_count=len(tasks),
+        events=json.dumps(events, indent=2) if events else "No events extracted.",
+        events_count=len(events),
+        bugs=json.dumps(bugs, indent=2) if bugs else "No bugs extracted.",
+        bugs_count=len(bugs),
+        followups=json.dumps(followups, indent=2) if followups else "No follow-ups extracted.",
+        followups_count=len(followups),
+        decisions=json.dumps(decisions, indent=2) if decisions else "No decisions extracted.",
+        decisions_count=len(decisions),
     )
-    
-    steps = result.get("steps", [{"role": "Summarizer", "auto_prompt": "Summarize the transcript and populate meeting_summary."}])
-    reasoning = result.get("reasoning", "No reasoning provided")
-    
-    print(f"\n   📋 Dynamic Steps Created: {len(steps)}")
-    for s in steps:
-        print(f"      - [{s.get('role')}]: {s.get('auto_prompt', '')[:80]}...")
-    print(f"   💭 Reasoning: {reasoning}")
-    
-    audit_log = state.get("audit_log", [])
-    audit_log.append(f"[{datetime.now().isoformat()}] ORCHESTRATOR: Created {len(steps)} dynamic steps | Reason={reasoning}")
-    
+
+    result = call_gemini_safe(prompt, fallback={
+        "directive": "Execute all extracted tasks, events, and bug tracking actions.",
+        "reasoning": "Default fallback plan.",
+        "priority_order": [],
+        "total_actions_expected": len(tasks) + len(events) + len(bugs)
+    })
+
+    directive = str(result.get("directive", "Execute all action items."))
+    reasoning = str(result.get("reasoning", ""))
+    total_expected = result.get("total_actions_expected", 0)
+
+    print(f"   🎯 Directive Set: {directive[:150]}...")
+    print(f"   💭 Reasoning: {reasoning[:150]}...")
+    print(f"   📊 Expected actions: {total_expected}")
+
+    audit_log = list(state.get("audit_log", []))
+    audit_log.append(f"[{datetime.now().isoformat()}] PLANNER: Strategic directive set. Expected {total_expected} actions. Reason={reasoning[:200]}")
+
+    agent_reasoning_list = list(state.get("agent_reasoning", []))
+    agent_reasoning_list.append({
+        "agent": "planner",
+        "reasoning": reasoning,
+        "outputs_produced": {"directive": directive, "total_expected": total_expected}
+    })
+
     return {
-        "dynamic_steps": steps,
-        "waiting_agents": {},
-        "completed_steps": [],
-        "orchestrator_reasoning": reasoning,
+        "orchestrator_reasoning": directive,
         "audit_log": audit_log,
+        "agent_reasoning": agent_reasoning_list,
     }

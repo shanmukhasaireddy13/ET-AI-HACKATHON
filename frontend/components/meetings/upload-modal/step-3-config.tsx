@@ -8,7 +8,7 @@ import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 
 interface Step3Props {
-  onFinish: () => void;
+  onFinish: (data: any) => void;
   onBack: () => void;
 }
 
@@ -22,6 +22,20 @@ const analysisOptions = [
 
 export function Step3Config({ onFinish, onBack }: Step3Props) {
   const [priority, setPriority] = useState<string>("Normal");
+  const [options, setOptions] = useState({
+    decisions: true,
+    tasks: true,
+    followups: true,
+    blockers: true,
+    sentiment: false
+  });
+
+  const handleFinish = () => {
+    onFinish({
+      priority,
+      options
+    });
+  };
 
   return (
     <div className="p-7 space-y-8">
@@ -31,7 +45,13 @@ export function Step3Config({ onFinish, onBack }: Step3Props) {
          <div className="divide-y divide-[#F8FAFC]">
             {analysisOptions.map((opt) => (
               <div key={opt.id} className="py-3.5 flex align-start gap-3">
-                 <Checkbox id={opt.id} defaultChecked={opt.checked} disabled={opt.pro} className="mt-0.5 border-[#E2E8F0]" />
+                 <Checkbox 
+                  id={opt.id} 
+                  checked={options[opt.id as keyof typeof options]} 
+                  onCheckedChange={(checked) => setOptions({...options, [opt.id]: !!checked})}
+                  disabled={opt.pro} 
+                  className="mt-0.5 border-[#E2E8F0]" 
+                 />
                  <div className="flex flex-col">
                     <div className="flex items-center gap-2">
                        <label htmlFor={opt.id} className="text-[13px] font-medium text-[#0F172A] cursor-pointer">
@@ -116,10 +136,11 @@ export function Step3Config({ onFinish, onBack }: Step3Props) {
          <Button onClick={onBack} variant="ghost" className="text-[#64748B] font-bold px-0 hover:bg-transparent hover:text-[#0F172A]">
             ← Back
          </Button>
-         <Button onClick={onFinish} className="h-12 px-8 bg-[#2563EB] hover:bg-blue-700 text-white rounded-lg font-bold text-[14px] shadow-xl shadow-blue/20 transition-all active:scale-95">
+         <Button onClick={handleFinish} className="h-12 px-8 bg-[#2563EB] hover:bg-blue-700 text-white rounded-lg font-bold text-[14px] shadow-xl shadow-blue/20 transition-all active:scale-95">
             Start Analysis 🚀
          </Button>
       </div>
     </div>
   );
 }
+

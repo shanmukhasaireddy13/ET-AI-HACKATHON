@@ -1,7 +1,10 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { CheckCircle2, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { createClient } from "@/lib/supabase/client";
+import { format } from "date-fns";
 
 export type Decision = "Approved" | "Rejected";
 
@@ -14,14 +17,55 @@ interface HistoryItem {
   decider: string;
 }
 
-const HISTORY_DATA: HistoryItem[] = [
-  { id: "h1", decision: "Approved", timestamp: "Mar 21 · 10:45", agent: "Jira Agent", action: "Create 14 Jira tickets for Meeting v102", decider: "You" },
-  { id: "h2", decision: "Rejected", timestamp: "Mar 20 · 16:30", agent: "Email Agent", action: "Send bulk invite to all 'Rahul' in directory", decider: "You" },
-  { id: "h3", decision: "Approved", timestamp: "Mar 20 · 14:12", agent: "Parser Agent", action: "Archive obsolete engineering logs", decider: "Rahul Sharma" },
-  { id: "h4", decision: "Approved", timestamp: "Mar 19 · 09:20", agent: "Jira Agent", action: "Sync Q3 roadmap to Confluence", decider: "You" },
-];
+export function ApprovalHistoryTable({ status }: { status: "approved" | "rejected" }) {
+  const [data, setData] = useState<HistoryItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const supabase = createClient();
 
-export function ApprovalHistoryTable() {
+  useEffect(() => {
+    async function fetchHistory() {
+      setLoading(true);
+      const { data: rawData, error } = await supabase
+        .from('approvals')
+        .select('*')
+        .eq('status', status)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error("Error fetching approval history:", error);
+      } else {
+        const formatted: HistoryItem[] = (rawData || []).map((a: any) => ({
+          id: a.id,
+          decision: (a.status.charAt(0).toUpperCase() + a.status.slice(1)) as Decision,
+          timestamp: a.created_at ? format(new Date(a.created_at), 'MMM dd · HH:mm') : "TBD",
+          agent: a.source_agent || "Agent",
+          action: `Execute ${a.tool_name}`,
+          decider: "You"
+        }));
+        setData(formatted);
+      }
+      setLoading(false);
+    }
+
+    fetchHistory();
+  }, [status]);
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-20 bg-white border border-slate-200 rounded-xl">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue"></div>
+      </div>
+    );
+  }
+
+  if (data.length === 0) {
+    return (
+      <div className="bg-white border border-slate-200 rounded-xl p-20 text-center shadow-sm">
+        <p className="text-[13px] text-slate-500 font-medium">No history found for {status} actions.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm animate-in fade-in duration-500">
       <table className="w-full text-left border-collapse">
@@ -35,20 +79,13 @@ export function ApprovalHistoryTable() {
           </tr>
         </thead>
         <tbody>
-          {HISTORY_DATA.map((item) => (
+          {data.map((item) => (
             <tr 
               key={item.id} 
               className={cn(
-                "h-14 border-b border-slate-50 hover:bg-slate-50/50 cursor-pointer transition-colors relative pl-1",
-                "group"
+                "h-14 border-b border-slate-50 hover:bg-slate-50/50 cursor-pointer transition-colors relative pl-1 group"
               )}
             >
-              {/* Left decision accent bar */}
-              <div className={cn(
-                "absolute left-0 top-1 bottom-1 w-[3px] rounded-r",
-                item.decision === "Approved" ? "bg-success" : "bg-error"
-              )} />
-              
               <td className="pl-5">
                 <div className={cn(
                   "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border",

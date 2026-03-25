@@ -20,6 +20,7 @@ interface UploadMeetingModalProps {
 
 export function UploadMeetingModal({ open, onOpenChange }: UploadMeetingModalProps) {
   const [step, setStep] = useState(1);
+  const [isUploading, setIsUploading] = useState(false);
   const [stepData, setStepData] = useState<any>({});
 
   const handleNext = (data: any) => {
@@ -31,9 +32,35 @@ export function UploadMeetingModal({ open, onOpenChange }: UploadMeetingModalPro
     setStep(step - 1);
   };
 
-  const handleFinish = () => {
-    onOpenChange(false);
-    setTimeout(() => setStep(1), 300);
+  const handleFinish = async (finalData: any) => {
+    const fullData = { ...stepData, ...finalData };
+    setIsUploading(true);
+    
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_GATEWAY_URL || 'http://localhost:3001'}/api/meetings`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(fullData),
+      });
+
+      if (!response.ok) throw new Error('Failed to upload meeting');
+      
+      const result = await response.json();
+      console.log("Meeting processed:", result);
+      
+      onOpenChange(false);
+      setTimeout(() => {
+        setStep(1);
+        setStepData({});
+        setIsUploading(false);
+      }, 300);
+    } catch (error) {
+      console.error("Upload error:", error);
+      setIsUploading(false);
+      alert("Failed to start analysis. Please check if the backend is running.");
+    }
   };
 
   const steps = [

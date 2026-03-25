@@ -1,99 +1,146 @@
 """
-🧠 LangGraph Orchestrator — TRULY DYNAMIC WORKFLOW
-====================================================
-The workflow is NOT pre-defined. The Orchestrator LLM analyzes the input
-and builds dynamic_steps. The Dispatcher loops through the plan, routing
-to the dynamic_agent which executes auto-prompts.
-
-FLOW:
-  Input → Orchestrator (builds dynamic step sequence)
-            ↓
-        Dispatcher ←──────────────────────────────┐
-            ↓                                     │
-     [Dynamic Agent] ─────────────────────────────┘
-     (executes auto-prompt, generates JSON outputs)
-            
-     When plan is exhausted:
-        Dispatcher → Executor ←───────────────┐
-                         ↓                    │
-                     Monitor ─(more steps)────┘
-                         │
-                         ├─(failure)─→ Recovery → Audit → END
-                         │
-                         └─(all done)─→ Audit → END
+🧠 SIDD Agent Engine — True Multi-Agent ReAct Workflow
+======================================================
+Architecture:
+  Phase 1 (Understand):  Parallel extraction agents extract structured data
+  Phase 2 (Aggregate):   Aggregator synchronizes all extraction results
+  Phase 3 (Plan):        Strategic Planner creates a unified execution directive
+  Phase 4 (Execute):     Brain -> Executor -> Monitor (ReAct loop)
+  Phase 5 (Audit):       Final report and database persistence
 """
 
 from langgraph.graph import StateGraph, END
 from state import AgentState
 
+# Phase 1: Understanding Agents (Pure Extractors)
+from agents.task_divider import task_divider_node
+from agents.scheduler import scheduler_node
+from agents.bug_tracker import bug_tracker_node
+from agents.followup import followup_node
+from agents.summary import summary_node
+
+# Phase 2: Aggregation
+from agents.aggregator import aggregator_node
+
+# Phase 3: Planning
 from agents.orchestrator import orchestrator_node
-from agents.dispatcher import dispatcher_node, get_next_route
-from agents.dynamic_agent import dynamic_agent_node
+
+# Phase 4: Execution (ReAct)
+from agents.brain import brain_node
 from agents.executor import execution_node
-from agents.monitor import monitor_node, get_monitor_route
-from agents.recovery import recovery_node, get_recovery_route
+from agents.monitor import monitor_node
+
+# Phase 5: Audit
 from agents.audit import audit_node
 
 
+# ─── ROUTING FUNCTIONS ───
+
+def get_brain_route(state: AgentState) -> str:
+    """After Brain: either execute proposed actions or finish."""
+    if state.get("is_goal_achieved", False):
+        return "audit"
+
+    queue = state.get("execution_queue", [])
+    current_idx = state.get("current_step_index", 0)
+    if current_idx < len(queue):
+        return "executor"
+
+    # Safety: if brain proposed nothing and goal not achieved, go to audit
+    return "audit"
+
+
+def get_monitor_route(state: AgentState) -> str:
+    """After Monitor: continue executing, loop back to brain, or finish."""
+    queue = state.get("execution_queue", [])
+    current_idx = state.get("current_step_index", 0)
+
+    # More items in the queue? Keep executing.
+    if current_idx < len(queue):
+        return "executor"
+
+    # Queue exhausted — loop back to Brain for more reasoning
+    return "brain"
+
+
 def build_graph():
-    """Builds the fully dynamic LangGraph workflow."""
+    """
+    Builds the True Multi-Agent ReAct pipeline.
     
+    Flow:
+      ENTRY
+        ├──> task_divider ──┐
+        ├──> scheduler   ───┤
+        ├──> bug_tracker ───┼──> aggregator ──> planner ──> brain <───┐
+        ├──> followup    ───┤                                 │       │
+        └──> summary     ───┘                                 v       │
+                                                          executor ──> monitor
+                                                                        │
+                                                                      audit ──> END
+    """
     builder = StateGraph(AgentState)
-    
-    # ═══ REGISTER ALL NODES ═══
-    builder.add_node("orchestrator",  orchestrator_node)
-    builder.add_node("dispatcher",    dispatcher_node)
-    builder.add_node("dynamic_agent", dynamic_agent_node)
-    builder.add_node("executor",      execution_node)
-    builder.add_node("monitor",       monitor_node)
-    builder.add_node("recovery",      recovery_node)
-    builder.add_node("audit",         audit_node)
-    
-    # ═══ ENTRY POINT ═══
-    builder.set_entry_point("orchestrator")
-    
-    # ═══ Orchestrator → Dispatcher (always) ═══
-    builder.add_edge("orchestrator", "dispatcher")
-    
-    # ═══ Dispatcher → Dynamic routing (reads dynamic_steps) ═══
+
+    # ─── PHASE 1: Understanding (Parallel Extraction) ───
+    builder.add_node("task_divider", task_divider_node)
+    builder.add_node("scheduler", scheduler_node)
+    builder.add_node("bug_tracker", bug_tracker_node)
+    builder.add_node("followup", followup_node)
+    builder.add_node("summary", summary_node)
+
+    # ─── PHASE 2: Aggregation ───
+    builder.add_node("aggregator", aggregator_node)
+
+    # ─── PHASE 3: Planning ───
+    builder.add_node("planner", orchestrator_node)
+
+    # ─── PHASE 4: Execution (ReAct Loop) ───
+    builder.add_node("brain", brain_node)
+    builder.add_node("executor", execution_node)
+    builder.add_node("monitor", monitor_node)
+
+    # ─── PHASE 5: Audit ───
+    builder.add_node("audit", audit_node)
+
+    # ═══ EDGES ═══
+
+    # Entry: Fan out to all extraction agents in parallel
+    builder.set_entry_point("task_divider")
+    # Since LangGraph doesn't natively support parallel fan-out from entry,
+    # we chain them sequentially but each is independent (no data dependencies)
+    builder.add_edge("task_divider", "scheduler")
+    builder.add_edge("scheduler", "bug_tracker")
+    builder.add_edge("bug_tracker", "followup")
+    builder.add_edge("followup", "summary")
+
+    # All extractors converge at Aggregator
+    builder.add_edge("summary", "aggregator")
+
+    # Aggregator -> Planner -> Brain
+    builder.add_edge("aggregator", "planner")
+    builder.add_edge("planner", "brain")
+
+    # ReAct Loop
     builder.add_conditional_edges(
-        "dispatcher",
-        get_next_route,
+        "brain",
+        get_brain_route,
         {
-            "dynamic_agent": "dynamic_agent",
-            "executor":      "executor",
-            "audit":         "audit",
+            "executor": "executor",
+            "audit": "audit"
         }
     )
-    
-    # ═══ Dynamic Agent → back to Dispatcher ═══
-    # This creates the dynamic loop: agent finishes → dispatcher checks
-    # if more steps in plan → routes to next one
-    builder.add_edge("dynamic_agent", "dispatcher")
-    
-    # ═══ Execution Pipeline ═══
+
     builder.add_edge("executor", "monitor")
-    
+
     builder.add_conditional_edges(
         "monitor",
         get_monitor_route,
         {
             "executor": "executor",
-            "recovery": "recovery",
-            "audit":    "audit",
+            "brain": "brain"
         }
     )
-    
-    builder.add_conditional_edges(
-        "recovery",
-        get_recovery_route,
-        {
-            "executor": "executor",
-            "audit":    "audit",
-        }
-    )
-    
-    # ═══ TERMINAL ═══
+
+    # Audit -> END
     builder.add_edge("audit", END)
-    
+
     return builder.compile()
