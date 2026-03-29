@@ -157,7 +157,7 @@ export function AgentRunTab({ reasoning = [], trace = [] }: { reasoning: any[], 
       <div className="pt-6 border-t border-slate-100">
         <p className="text-[12px] text-muted-text flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 text-success" />
-          System verified: 100% Agentic Workflow powered by SIDD Brain.
+          System verified: 100% Agentic Workflow powered by Meeting Mind Brain.
         </p>
       </div>
     </div>

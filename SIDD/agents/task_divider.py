@@ -14,7 +14,10 @@ Extract each task. For each task, provide:
 - Priority (high/medium/low)
 - Deadline (if mentioned, otherwise "TBD")
 
-IMPORTANT: Return ONLY a valid JSON object in this exact format, no other text:
+IMPORTANT RULES:
+- Focus on general project management, administrative tasks, and coordination (e.g. "Send email", "Update documentation").
+- EXCLUDE strictly technical bugs or pipeline errors (those are handled by the Bug Tracker).
+- Return ONLY a valid JSON object in this exact format, no other text:
 {{
     "tasks": [
         {{"title": "task description", "assignee": "person", "priority": "high", "deadline": "2023-12-01"}}
