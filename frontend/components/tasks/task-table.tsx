@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { 
   ChevronDown, 
   ChevronRight, 
@@ -23,14 +23,24 @@ import {
 
 type GroupBy = "none" | "assignee" | "priority" | "status" | "meeting";
 
-export function TaskTable({ tasks = [] }: { tasks?: any[] }) {
+interface Task {
+  id: string;
+  title: string;
+  assignee: { name: string };
+  priority: string;
+  status: string;
+  source: string;
+  dueDate: string;
+  isOverdue?: boolean;
+}
+
+export function TaskTable({ tasks = [] }: { tasks?: Task[] }) {
   const [groupBy, setGroupBy] = useState<GroupBy>("none");
   const [collapsedGroups, setCollapsedGroups] = useState<string[]>([]);
 
   const groupData = () => {
     if (groupBy === "none") return { "All Tasks": tasks };
-    
-    return (tasks as any[]).reduce((acc, task) => {
+    return tasks.reduce((acc, task) => {
       const key = groupBy === "assignee" ? task.assignee.name : 
                  groupBy === "priority" ? task.priority :
                  groupBy === "status" ? task.status : task.source;
@@ -38,7 +48,7 @@ export function TaskTable({ tasks = [] }: { tasks?: any[] }) {
       if (!acc[key]) acc[key] = [];
       acc[key].push(task);
       return acc;
-    }, {} as Record<string, typeof TASKS>);
+    }, {} as Record<string, Task[]>);
   };
 
   const toggleGroup = (group: string) => {
@@ -87,7 +97,7 @@ export function TaskTable({ tasks = [] }: { tasks?: any[] }) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {Object.entries(groups).map(([groupName, groupTasks]) => (
+          {(Object.entries(groups) as [string, Task[]][]).map(([groupName, groupTasks]) => (
             <React.Fragment key={groupName}>
               {groupBy !== "none" && (
                 <TableRow 
@@ -174,4 +184,3 @@ export function TaskTable({ tasks = [] }: { tasks?: any[] }) {
   );
 }
 
-import React from "react";
