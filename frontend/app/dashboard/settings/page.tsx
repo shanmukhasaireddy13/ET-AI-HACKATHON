@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { SettingsNav, SettingsSection } from "@/components/settings/settings-nav";
 import { UnsavedChangesBar } from "@/components/settings/unsaved-changes-bar";
@@ -15,7 +15,7 @@ import { BillingPanel } from "@/components/settings/billing-panel";
 import { APIKeysPanel } from "@/components/settings/api-keys-panel";
 import { cn } from "@/lib/utils";
 
-export default function SettingsPage() {
+function SettingsContent() {
   const searchParams = useSearchParams();
   const initialSection = (searchParams.get("section") as SettingsSection) || "profile";
   
@@ -111,5 +111,17 @@ export default function SettingsPage() {
         isLoading={isLoading}
       />
     </div>
+  );
+}
+
+export default function SettingsPage() {
+  return (
+    <Suspense fallback={
+       <div className="flex justify-center p-20">
+         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue"></div>
+       </div>
+    }>
+      <SettingsContent />
+    </Suspense>
   );
 }

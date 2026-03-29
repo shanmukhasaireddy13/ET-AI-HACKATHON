@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -25,7 +25,7 @@ type Meeting = {
   source?: string;
 };
 
-export default function MeetingsPage() {
+function MeetingsContent() {
   const [view, setView] = useState<"list" | "grid">("list");
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
@@ -141,6 +141,18 @@ export default function MeetingsPage() {
 
       <UploadMeetingModal open={isUploadOpen} onOpenChange={setIsUploadOpen} />
     </div>
+  );
+}
+
+export default function MeetingsPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex justify-center p-20">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue"></div>
+      </div>
+    }>
+      <MeetingsContent />
+    </Suspense>
   );
 }
 
