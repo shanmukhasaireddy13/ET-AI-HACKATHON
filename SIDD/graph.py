@@ -1,5 +1,5 @@
 """
-🧠 SIDD Agent Engine — True Multi-Agent ReAct Workflow
+🧠 Meeting Mind Agent Engine — True Multi-Agent ReAct Workflow
 ======================================================
 Architecture:
   Phase 1 (Understand):  Parallel extraction agents extract structured data
@@ -12,15 +12,8 @@ Architecture:
 from langgraph.graph import StateGraph, END
 from state import AgentState
 
-# Phase 1: Understanding Agents (Pure Extractors)
-from agents.task_divider import task_divider_node
-from agents.scheduler import scheduler_node
-from agents.bug_tracker import bug_tracker_node
-from agents.followup import followup_node
-from agents.summary import summary_node
-
-# Phase 2: Aggregation
-from agents.aggregator import aggregator_node
+# Phase 1: Understanding Agent (Unified Extractor)
+from agents.synthesizer import synthesizer_node
 
 # Phase 3: Planning
 from agents.orchestrator import orchestrator_node
@@ -68,27 +61,17 @@ def build_graph():
     Builds the True Multi-Agent ReAct pipeline.
     
     Flow:
-      ENTRY
-        ├──> task_divider ──┐
-        ├──> scheduler   ───┤
-        ├──> bug_tracker ───┼──> aggregator ──> planner ──> brain <───┐
-        ├──> followup    ───┤                                 │       │
-        └──> summary     ───┘                                 v       │
-                                                          executor ──> monitor
-                                                                        │
-                                                                      audit ──> END
+      ENTRY ──> synthesizer ──> planner ──> brain <───┐
+                                              │       │
+                                              v       │
+                                          executor ──> monitor
+                                                        │
+                                                      audit ──> END
     """
     builder = StateGraph(AgentState)
 
-    # ─── PHASE 1: Understanding (Parallel Extraction) ───
-    builder.add_node("task_divider", task_divider_node)
-    builder.add_node("scheduler", scheduler_node)
-    builder.add_node("bug_tracker", bug_tracker_node)
-    builder.add_node("followup", followup_node)
-    builder.add_node("summary", summary_node)
-
-    # ─── PHASE 2: Aggregation ───
-    builder.add_node("aggregator", aggregator_node)
+    # ─── PHASE 1: Understanding (Unified Extraction) ───
+    builder.add_node("synthesizer", synthesizer_node)
 
     # ─── PHASE 3: Planning ───
     builder.add_node("planner", orchestrator_node)
@@ -103,20 +86,11 @@ def build_graph():
 
     # ═══ EDGES ═══
 
-    # Entry: Fan out to all extraction agents in parallel
-    builder.set_entry_point("task_divider")
-    # Since LangGraph doesn't natively support parallel fan-out from entry,
-    # we chain them sequentially but each is independent (no data dependencies)
-    builder.add_edge("task_divider", "scheduler")
-    builder.add_edge("scheduler", "bug_tracker")
-    builder.add_edge("bug_tracker", "followup")
-    builder.add_edge("followup", "summary")
-
-    # All extractors converge at Aggregator
-    builder.add_edge("summary", "aggregator")
-
-    # Aggregator -> Planner -> Brain
-    builder.add_edge("aggregator", "planner")
+    # Entry: Start with unified extraction
+    builder.set_entry_point("synthesizer")
+    
+    # Synthesizer -> Planner -> Brain
+    builder.add_edge("synthesizer", "planner")
     builder.add_edge("planner", "brain")
 
     # ReAct Loop
@@ -144,3 +118,4 @@ def build_graph():
     builder.add_edge("audit", END)
 
     return builder.compile()
+
