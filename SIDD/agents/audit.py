@@ -1,6 +1,9 @@
 from state import AgentState
+import json
+import os
 from datetime import datetime
 from tools.database import save_meeting_results
+from tools.external_apis import create_notion_task, _get_integration
 
 def audit_node(state: AgentState) -> dict:
     """
@@ -66,6 +69,38 @@ def audit_node(state: AgentState) -> dict:
     report += f"{'=' * 50}"
 
     print(report)
+    
+    # ─── AUTO-SYNC: Notion ───
+    try:
+        notion_int = _get_integration("notion")
+        is_connected = notion_int.get("status") == "connected"
+        
+        # Determine if we should auto-push
+        auto_push_enabled = False
+        if is_connected:
+            try:
+                extra = json.loads(notion_int.get("extra", "{}"))
+                auto_push_enabled = extra.get("auto_push", True)
+            except:
+                auto_push_enabled = True
+        else:
+            # Fallback for manual .env users
+            if os.getenv("NOTION_TOKEN") and os.getenv("NOTION_DATABASE_ID"):
+                auto_push_enabled = True
+                print("   ℹ️ Notion: Using .env credentials for auto-sync.")
+
+        if auto_push_enabled:
+            print(f"\n🚀 AUTO-SYNC: Syncing {len(state.get('assigned_tasks', []))} tasks to Notion...")
+            for task in state.get("assigned_tasks", []):
+                create_notion_task(
+                    title=task.get("title", "Untitled Task"),
+                    description=task.get("description", ""),
+                    priority=task.get("priority", "Medium"),
+                    deadline=task.get("deadline")
+                )
+            audit_log.append(f"[{datetime.now().isoformat()}] AUDIT: Automatically synced items to Notion.")
+    except Exception as e:
+         print(f"   ⚠️ Auto-sync error: {e}")
 
     # ─── PERSIST TO SUPABASE ───
     try:
