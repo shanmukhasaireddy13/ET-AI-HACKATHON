@@ -28,11 +28,12 @@ app.add_middleware(
 )
 
 # Import tool registry for approval execution
-from tools.external_apis import create_jira_ticket, send_slack_message, schedule_calendar_event
+from tools.external_apis import create_jira_ticket, send_slack_message, schedule_calendar_event, create_notion_task
 TOOL_REGISTRY = {
     "create_jira_ticket": create_jira_ticket,
     "send_slack_message": send_slack_message,
     "schedule_calendar_event": schedule_calendar_event,
+    "create_notion_task": create_notion_task,
 }
 
 
@@ -324,6 +325,75 @@ async def approval_decision(approval_id: str, req: ApprovalDecisionRequest):
                 result["execution_result"] = {"status": "failed", "error": str(e)}
     
     return result
+
+
+class TaskPushRequest(BaseModel):
+    service: str  # "jira" or "notion"
+
+
+@app.post("/api/tasks/{task_id}/push")
+async def push_task_manual(task_id: str, req: TaskPushRequest):
+    """
+    Manually push a specific task to Jira or Notion.
+    """
+    init_db()
+    
+    # 1. Fetch task from Supabase
+    url = f"{PROJECT_URL}/rest/v1/tasks?id=eq.{task_id}"
+    resp = requests.get(url, headers=HEADERS)
+    if not resp.ok or not resp.json():
+        raise HTTPException(status_code=404, detail="Task not found")
+    
+    task = resp.json()[0]
+    
+    # 2. Map service to tool
+    tool_name = "create_jira_ticket" if req.service == "jira" else "create_notion_task"
+    tool_fn = TOOL_REGISTRY.get(tool_name)
+    
+    if not tool_fn:
+        raise HTTPException(status_code=400, detail=f"Tool {tool_name} not found")
+    
+    # 3. Prepare args
+    args = {
+        "title": task.get("title", "Untitled Task"),
+        "description": f"Created from meeting: {task.get('meeting_id', 'Unknown')}"
+    }
+    
+    if req.service == "notion":
+        args["priority"] = task.get("priority", "Medium")
+        # deadline could be added here if due_at exists
+    
+    # 4. Execute
+    try:
+        result = tool_fn(**args)
+        
+        # 5. Update task in Supabase on success
+        if result.get("status") == "success":
+            update_payload = {}
+            if req.service == "jira":
+                update_payload["jira_key"] = result.get("ticket_id")
+            elif req.service == "notion":
+                # We'll store Notion URL in a metadata field or project_key (Supabase schema dependent)
+                # For now, we'll just record it in activity
+                pass
+            
+            if update_payload:
+                requests.patch(url, headers=HEADERS, json=update_payload)
+                
+            # Log Activity
+            from tools.database import record_activity
+            record_activity(
+                category="task",
+                action="pushed",
+                description=f"Task '{task.get('title')}' pushed to {req.service}.",
+                entity_id=task_id,
+                entity_type="task",
+                metadata={"service": req.service, "result": result}
+            )
+            
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 def _build_snapshot(m, meeting_id):

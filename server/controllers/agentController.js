@@ -93,3 +93,15 @@ export async function chat(req, res) {
   }
 }
 
+export async function pushTask(req, res) {
+  try {
+    const { taskId } = req.params;
+    const { service } = req.body;
+    const data = await callPython(req, "post", `/api/tasks/${taskId}/push`, { service });
+    res.json({ success: true, data });
+  } catch (err) {
+    console.error("Push task error:", err);
+    res.status(err.response?.status || 500).json({ error: "Failed to push task to external service" });
+  }
+}
+
