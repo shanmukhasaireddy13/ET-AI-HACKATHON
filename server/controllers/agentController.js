@@ -48,9 +48,9 @@ export async function getRunSnapshot(req, res) {
 export async function healthCheck(req, res) {
   try {
     const backend = await callPython(req, "get", "/health");
-    res.json({ status: "ok", service: "sidd-gateway", backend });
+    res.json({ status: "ok", service: "meeting-mind-gateway", backend });
   } catch {
-    res.json({ status: "ok", service: "sidd-gateway", backend: "unreachable" });
+    res.json({ status: "ok", service: "meeting-mind-gateway", backend: "unreachable" });
   }
 }
 

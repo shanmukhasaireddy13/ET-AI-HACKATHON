@@ -1,12 +1,26 @@
 import json
 from datetime import datetime
 from state import AgentState
-from tools.external_apis import create_jira_ticket, send_slack_message, schedule_calendar_event, create_notion_task
+from tools.external_apis import (
+    create_jira_ticket, update_jira_ticket, search_jira_issues, 
+    delete_jira_issue, add_jira_comment, transition_jira_issue,
+    get_jira_comments, get_jira_transitions, assign_jira_issue, fetch_project_issues,
+    send_slack_message, schedule_calendar_event, create_notion_task
+)
 from tools.database import save_execution_step, update_execution_step, record_activity
 
 # Mapping tool names to actual Python functions
 TOOL_MAP = {
     "create_jira_ticket": create_jira_ticket,
+    "update_jira_ticket": update_jira_ticket,
+    "search_jira_issues": search_jira_issues,
+    "delete_jira_issue": delete_jira_issue,
+    "add_jira_comment": add_jira_comment,
+    "transition_jira_issue": transition_jira_issue,
+    "get_jira_comments": get_jira_comments,
+    "get_jira_transitions": get_jira_transitions,
+    "assign_jira_issue": assign_jira_issue,
+    "fetch_project_issues": fetch_project_issues,
     "send_slack_message": send_slack_message,
     "schedule_calendar_event": schedule_calendar_event,
     "create_notion_task": create_notion_task
@@ -40,7 +54,7 @@ def execution_node(state: AgentState) -> dict:
     # 1. Initialize Trace Entry in DB
     trace_entry = save_execution_step(meeting_id, {
         "step_index": idx + 1,
-        "agent_role": "SIDD_Brain",
+        "agent_role": "MeetingMind_Brain",
         "thought": thought,
         "tool_name": tool_name,
         "tool_args": args,
@@ -63,7 +77,7 @@ def execution_node(state: AgentState) -> dict:
             "args": args,
             "criticality": criticality,
             "reason": f"Automated Risk Assessment: Level {criticality}/10 tool call.",
-            "source_agent": "SIDD_Brain",
+            "source_agent": "MeetingMind_Brain",
             "trace_id": trace_id
         })
         
@@ -71,6 +85,7 @@ def execution_node(state: AgentState) -> dict:
         execution_results.append({
             "step": idx,
             "tool": tool_name,
+            "args": args,
             "result": {"status": "gated", "message": "Awaiting human approval — this action is pending review. Move to the next task."}
         })
         
@@ -86,10 +101,28 @@ def execution_node(state: AgentState) -> dict:
     if not tool_fn:
         error = f"Unknown tool: {tool_name}"
         if trace_id: update_execution_step(trace_id, {"status": "failed", "error": error})
-        return {"execution_results": state.get("execution_results", []) + [{"step": idx, "tool": tool_name, "result": {"status": "failed", "error": error}}]}
+        return {"execution_results": state.get("execution_results", []) + [{"step": idx, "tool": tool_name, "args": args, "result": {"status": "failed", "error": error}}]}
 
     try:
         result = tool_fn(**args)
+        
+        # Check if the tool itself reported failure (returned dict with status: "failed")
+        tool_failed = isinstance(result, dict) and result.get("status") == "failed"
+        
+        if tool_failed:
+            error_msg = result.get("error", "Tool returned failure status")
+            print(f"   ❌ Tool reported failure: {error_msg}")
+            if trace_id: update_execution_step(trace_id, {"status": "failed", "error": error_msg})
+            
+            execution_results = list(state.get("execution_results", []))
+            execution_results.append({
+                "step": idx,
+                "tool": tool_name,
+                "args": args,
+                "result": {"status": "failed", "error": error_msg}
+            })
+            return {"execution_results": execution_results}
+        
         print(f"   ✅ Execution Success: {result}")
         if trace_id: update_execution_step(trace_id, {"status": "success", "result": result})
         
@@ -97,6 +130,7 @@ def execution_node(state: AgentState) -> dict:
         execution_results.append({
             "step": idx,
             "tool": tool_name,
+            "args": args,
             "result": {"status": "success", "data": result}
         })
         
@@ -111,6 +145,7 @@ def execution_node(state: AgentState) -> dict:
         execution_results.append({
             "step": idx,
             "tool": tool_name,
+            "args": args,
             "result": {"status": "failed", "error": error_msg}
         })
         
