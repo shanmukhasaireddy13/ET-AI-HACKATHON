@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 
-export function TasksTab({ tasks = [] }: { tasks: any[] }) {
+export function TasksTab({ tasks = [], onPush }: { tasks: any[], onPush?: (taskId: string, service: "jira" | "notion") => void }) {
   const displayTasks = tasks.length > 0 ? tasks.map(t => ({
     id: t.id,
     title: t.title,
@@ -132,17 +132,30 @@ export function TasksTab({ tasks = [] }: { tasks: any[] }) {
                   </Badge>
                 </TableCell>
                 <TableCell>
-                  {task.jira ? (
-                    <div className="flex items-center gap-1.5 text-blue hover:underline font-bold text-[11px]">
-                      <span className="w-3.5 h-3.5 bg-blue/10 rounded flex items-center justify-center text-[8px]">J</span>
-                      {task.jira}
-                    </div>
-                  ) : (
-                    <button className="flex items-center gap-1.5 text-slate-400 hover:text-blue transition-colors font-bold text-[11px] group/push">
-                      <Upload className="w-3 h-3 group-hover/push:-translate-y-0.5 transition-transform" />
-                      Push
+                  <div className="flex items-center gap-3">
+                    {task.jira ? (
+                      <div className="flex items-center gap-1.5 text-blue hover:underline font-bold text-[11px]">
+                        <span className="w-3.5 h-3.5 bg-blue/10 rounded flex items-center justify-center text-[8px]">J</span>
+                        {task.jira}
+                      </div>
+                    ) : (
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); onPush?.(task.id, "jira"); }}
+                        className="flex items-center gap-1.5 text-slate-400 hover:text-blue transition-colors font-bold text-[11px] group/push"
+                      >
+                        <Upload className="w-3 h-3 group-hover/push:-translate-y-0.5 transition-transform" />
+                        Jira
+                      </button>
+                    )}
+
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); onPush?.(task.id, "notion"); }}
+                      className="flex items-center gap-1.5 text-slate-400 hover:text-black transition-colors font-bold text-[11px] group/push-notion"
+                    >
+                      <div className="w-3.5 h-3.5 bg-slate-100 rounded flex items-center justify-center text-[8px] font-black group-hover/push-notion:bg-black group-hover/push-notion:text-white transition-colors">N</div>
+                      Notion
                     </button>
-                  )}
+                  </div>
                 </TableCell>
                 <TableCell className="text-right pr-4">
                   <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
