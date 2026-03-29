@@ -26,6 +26,7 @@ import { IntegrationCard, IntegrationStatus } from "@/components/integrations/in
 import { JiraConfigDrawer } from "@/components/integrations/jira-config-drawer";
 import { SlackConfigDrawer } from "@/components/integrations/slack-config-drawer";
 import { EmailConfigDrawer } from "@/components/integrations/email-config-drawer";
+import { NotionConfigDrawer } from "@/components/integrations/notion-config-drawer";
 import { ConnectModal } from "@/components/integrations/connect-modal";
 import { DisconnectAlert } from "@/components/integrations/disconnect-alert";
 import { createClient } from "@/lib/supabase/client";
@@ -36,6 +37,7 @@ export default function IntegrationsPage() {
   const [isJiraOpen, setIsJiraOpen] = useState(false);
   const [isSlackOpen, setIsSlackOpen] = useState(false);
   const [isEmailOpen, setIsEmailOpen] = useState(false);
+  const [isNotionOpen, setIsNotionOpen] = useState(false);
   const [isConnectOpen, setIsConnectOpen] = useState(false);
   const [isDisconnectOpen, setIsDisconnectOpen] = useState(false);
   const [selectedIntegration, setSelectedIntegration] = useState<any>(null);
@@ -142,6 +144,7 @@ export default function IntegrationsPage() {
                         if (item.name === "Jira") setIsJiraOpen(true);
                         if (item.name === "Slack") setIsSlackOpen(true);
                         if (item.name === "Email/SMTP") setIsEmailOpen(true);
+                        if (item.name === "Notion") setIsNotionOpen(true);
                       }}
                       onDisconnect={() => handleDisconnect(item.name)}
                     />
@@ -169,7 +172,10 @@ export default function IntegrationsPage() {
                    description={item.desc || ""}
                    icon={item.icon}
                    status="available"
-                   onConnect={() => handleConnect(item.name, item.icon)}
+                   onConnect={() => {
+                     if (item.name === "Notion") setIsNotionOpen(true);
+                     else handleConnect(item.name, item.icon);
+                   }}
                 />
               ))}
            </div>
@@ -179,6 +185,7 @@ export default function IntegrationsPage() {
         <JiraConfigDrawer open={isJiraOpen} onOpenChange={setIsJiraOpen} />
         <SlackConfigDrawer open={isSlackOpen} onOpenChange={setIsSlackOpen} />
         <EmailConfigDrawer open={isEmailOpen} onOpenChange={setIsEmailOpen} />
+        <NotionConfigDrawer open={isNotionOpen} onOpenChange={setIsNotionOpen} onSuccess={fetchIntegrations} />
         
         <ConnectModal 
           open={isConnectOpen} 
