@@ -1,5 +1,5 @@
 """
-🚀 Supabase Persistence Layer for SIDD
+🚀 Supabase Persistence Layer for Meeting Mind
 ======================================
 Stores all meeting workflow results in Supabase PostgreSQL via PostgREST.
 """
@@ -12,7 +12,7 @@ import requests
 from datetime import datetime
 from dotenv import load_dotenv
 
-# Load env from SIDD folder
+# Load env from MeetingMind folder
 load_dotenv()
 
 PROJECT_URL = os.getenv("PROJECT_URL")
@@ -279,7 +279,7 @@ def save_execution_step(meeting_id: str, step_data: dict) -> dict:
     payload = {
         "meeting_id": meeting_id,
         "step_index": step_data.get("step_index", 0),
-        "agent_role": step_data.get("agent_role", "SIDD_Brain"),
+        "agent_role": step_data.get("agent_role", "MeetingMind_Brain"),
         "thought": step_data.get("thought", ""),
         "tool_name": step_data.get("tool_name", ""),
         "tool_args": step_data.get("tool_args", {}),

@@ -20,8 +20,8 @@ def test_notion_integration():
     print(f"DEBUG: NOTION_DATABASE_ID in env: {'Found' if os.getenv('NOTION_DATABASE_ID') else 'NOT FOUND'}")
     
     # Sample task data
-    title = "Test Task from SIDD"
-    description = "This is a test task created by the new Notion integration in SIDD."
+    title = "Test Task from Meeting Mind"
+    description = "This is a test task created by the new Notion integration in Meeting Mind."
     deadline = "2026-04-30"
     priority = "High"
     effort = 2.5

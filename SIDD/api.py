@@ -1,5 +1,5 @@
 """
-SIDD Agent Engine — Pure AI Core
+Meeting Mind Agent Engine — Pure AI Core
 No CRUD, no web logic, no OAuth.
 Just the LangGraph agent execution engine.
 """
@@ -13,11 +13,14 @@ from fastapi import FastAPI, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from main import create_empty_state
+from main import create_empty_state, load_state_from_db
 from graph import build_graph
-from tools.database import save_meeting_results, get_meeting, init_db, HEADERS, PROJECT_URL
+from tools.database import (
+    save_meeting_results, get_meeting, init_db, HEADERS, PROJECT_URL,
+    save_execution_step, update_execution_step, record_activity
+)
 
-app = FastAPI(title="SIDD Agent Engine", version="3.0.0")
+app = FastAPI(title="Meeting Mind Agent Engine", version="3.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -28,9 +31,23 @@ app.add_middleware(
 )
 
 # Import tool registry for approval execution
-from tools.external_apis import create_jira_ticket, send_slack_message, schedule_calendar_event, create_notion_task
+from tools.external_apis import (
+    create_jira_ticket, update_jira_ticket, search_jira_issues, 
+    delete_jira_issue, add_jira_comment, transition_jira_issue,
+    get_jira_comments, get_jira_transitions, assign_jira_issue, fetch_project_issues,
+    send_slack_message, schedule_calendar_event, create_notion_task
+)
 TOOL_REGISTRY = {
     "create_jira_ticket": create_jira_ticket,
+    "update_jira_ticket": update_jira_ticket,
+    "search_jira_issues": search_jira_issues,
+    "delete_jira_issue": delete_jira_issue,
+    "add_jira_comment": add_jira_comment,
+    "transition_jira_issue": transition_jira_issue,
+    "get_jira_comments": get_jira_comments,
+    "get_jira_transitions": get_jira_transitions,
+    "assign_jira_issue": assign_jira_issue,
+    "fetch_project_issues": fetch_project_issues,
     "send_slack_message": send_slack_message,
     "schedule_calendar_event": schedule_calendar_event,
     "create_notion_task": create_notion_task,
@@ -55,18 +72,22 @@ class ApprovalDecisionRequest(BaseModel):
 
 @app.get("/health")
 async def health_check():
-    return {"status": "ok", "service": "sidd-agent-engine", "version": "3.0"}
+    return {"status": "ok", "service": "meeting-mind-agent-engine", "version": "3.0"}
 
 
 # ═══════════════════════════════════════════
 #  AGENT EXECUTION (Core)
 # ═══════════════════════════════════════════
 
-def run_workflow_sync(meeting_id: str, transcript: str):
+def run_workflow_sync(meeting_id: str, transcript: str, resume: bool = False):
     """Runs the LangGraph workflow. The audit node handles persistence."""
     graph = build_graph()
-    state = create_empty_state(transcript)
-    state["meeting_id"] = meeting_id
+    
+    if resume:
+        state = load_state_from_db(meeting_id)
+    else:
+        state = create_empty_state(transcript)
+        state["meeting_id"] = meeting_id
     
     try:
         accumulated_state = dict(state)
@@ -257,7 +278,7 @@ async def audit_logs(meeting_id: str):
         agent = "System"
         
         if "PLANNER" in entry: agent = "Planner"
-        elif "BRAIN" in entry: agent = "SIDD Brain"
+        elif "BRAIN" in entry: agent = "Meeting Mind Brain"
         elif "EXECUTOR" in entry: agent = "Executor"
         elif "MONITOR" in entry: agent = "Monitor"
         elif "AUDIT" in entry: agent = "Auditor"
@@ -294,33 +315,55 @@ async def fetch_reasoning(meeting_id: str):
 
 
 @app.post("/api/approvals/{approval_id}/decision")
-async def approval_decision(approval_id: str, req: ApprovalDecisionRequest):
+async def approval_decision(approval_id: str, req: ApprovalDecisionRequest, background_tasks: BackgroundTasks):
     """
     Human approves or rejects a gated action.
-    If approved, the held tool call is EXECUTED immediately.
+    If approved, the held tool call is EXECUTED immediately, results recorded,
+    and then Meeting Mind is RE-TRIGGERED to finish the plan.
     """
-    from tools.database import decide_approval
+    from tools.database import decide_approval, record_activity, save_execution_step
     
     if req.status not in ("approved", "rejected"):
         raise HTTPException(status_code=400, detail="Status must be 'approved' or 'rejected'")
     
     updated = decide_approval(approval_id, req.status, req.approved_by, req.feedback)
-    
     if not updated:
         raise HTTPException(status_code=404, detail="Approval not found")
     
-    result = {"approval": updated, "execution_result": None}
+    meeting_id = updated.get("meeting_id")
+    result = {"approval": updated, "execution_result": None, "resumed": False}
     
     if req.status == "approved":
-        tool_name = updated.get("tool", "")
+        tool_name = updated.get("tool_name", "") # Fixed table key
         args_raw = updated.get("args", "{}")
         args = json.loads(args_raw) if isinstance(args_raw, str) else args_raw
         
         tool_fn = TOOL_REGISTRY.get(tool_name)
         if tool_fn:
             try:
+                print(f"🚀 [API] Executing approved tool: {tool_name}")
                 exec_result = tool_fn(**args)
                 result["execution_result"] = exec_result
+                
+                # 💾 RECORD the result in the execution trace so the Brain sees it upon resumption
+                save_execution_step(meeting_id, {
+                    "step_index": 99,  # High index for manual/approved steps
+                    "agent_role": "Human-Approved-Executor",
+                    "thought": f"User approved execution of {tool_name}.",
+                    "tool_name": tool_name,
+                    "tool_args": args,
+                    "status": "success" if exec_result.get("status") == "success" else "failed",
+                    "result": exec_result
+                })
+                
+                # 🔄 RESUME the workflow autonomously
+                res = requests.get(f"{PROJECT_URL}/rest/v1/meetings?id=eq.{meeting_id}", headers=HEADERS)
+                transcript = res.json()[0].get("transcript", "") if res.ok and res.json() else ""
+                
+                background_tasks.add_task(run_workflow_sync, meeting_id, transcript, True)
+                result["resumed"] = True
+                print(f"✅ [API] Resumed Meeting Mind workflow for meeting {meeting_id}")
+                
             except Exception as e:
                 result["execution_result"] = {"status": "failed", "error": str(e)}
     
