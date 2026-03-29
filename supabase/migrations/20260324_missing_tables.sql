@@ -1,5 +1,5 @@
 -- Migration: 20260324_missing_tables.sql
--- Description: Adds missing tables for SIDD agent engine to Supabase
+-- Description: Adds missing tables for Meeting Mind agent engine to Supabase
 
 -- Events Table
 CREATE TABLE IF NOT EXISTS events (

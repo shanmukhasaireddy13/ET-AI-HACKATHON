@@ -57,6 +57,76 @@ def create_empty_state(transcript: str) -> dict:
     }
 
 
+def load_state_from_db(meeting_id: str) -> dict:
+    """
+    🔄 STATE HYDRATION
+    Loads the full AgentState from Supabase to resume a workflow.
+    """
+    from tools.database import PROJECT_URL, HEADERS
+    import requests
+
+    print(f"🔄 Hydrating state for meeting: {meeting_id}...")
+
+    # 1. Fetch meeting record (transcript, summary)
+    res = requests.get(f"{PROJECT_URL}/rest/v1/meetings?id=eq.{meeting_id}", headers=HEADERS)
+    meeting = res.json()[0] if res.ok and res.json() else {}
+    transcript = meeting.get("transcript", "")
+    
+    state = create_empty_state(transcript)
+    state["meeting_id"] = meeting_id
+    state["meeting_summary"] = meeting.get("summary", "")
+
+    # 2. Fetch Extracted Data
+    node_data_map = {
+        "tasks": "assigned_tasks",
+        "bug_tickets": "bug_tickets",
+        "events": "scheduled_events",
+        "followups": "followup_items",
+        "decisions": "decisions",
+        "key_topics": "key_topics"
+    }
+    
+    for table, state_key in node_data_map.items():
+        res = requests.get(f"{PROJECT_URL}/rest/v1/{table}?meeting_id=eq.{meeting_id}", headers=HEADERS)
+        if res.ok:
+            data = res.json()
+            if state_key == "key_topics":
+                state[state_key] = [t.get("topic") for t in data]
+            else:
+                state[state_key] = data
+
+    # 3. Fetch Execution History (CRITICAL for ReAct)
+    res = requests.get(f"{PROJECT_URL}/rest/v1/agent_execution_steps?meeting_id=eq.{meeting_id}&order=step_index.asc", headers=HEADERS)
+    if res.ok:
+        steps = res.json()
+        state["execution_results"] = [
+            {
+                "tool": s.get("tool_name"), 
+                "args": s.get("tool_args", {}), # CRITICAL: must have args to recognize task
+                "result": s.get("result", {}), 
+                "status": s.get("status")
+            }
+            for s in steps
+        ]
+
+    # 4. Fetch Reasoning Trail
+    res = requests.get(f"{PROJECT_URL}/rest/v1/agent_reasoning?meeting_id=eq.{meeting_id}", headers=HEADERS)
+    if res.ok:
+        reasoning = res.json()
+        state["agent_reasoning"] = [
+            {"agent": r.get("agent_name"), "reasoning": r.get("reasoning"), "outputs_produced": r.get("context_data")}
+            for r in reasoning
+        ]
+        
+        # Hydrate the specific planner directive (orchestrator_reasoning)
+        planner_entry = next((r for r in reasoning if r.get("agent_name") == "planner"), None)
+        if planner_entry:
+            state["orchestrator_reasoning"] = planner_entry.get("reasoning", "")
+
+    print(f"   ✅ State hydrated: {len(state['execution_results'])} previous tools found.")
+    return state
+
+
 def run_scenario(graph, name: str, transcript: str):
     """Runs a single scenario through the full multi-agent pipeline."""
     print(f"\n{'#' * 70}")
@@ -86,7 +156,7 @@ def run_scenario(graph, name: str, transcript: str):
 
 def main():
     print("=" * 70)
-    print("🚀 TRUE MULTI-AGENT ReAct WORKFLOW ENGINE")
+    print("🚀 TRUE MULTI-AGENT ReAct WORKFLOW ENGINE (Meeting Mind)")
     print("   Understand → Plan → Execute → Monitor → Audit")
     print("=" * 70)
 
