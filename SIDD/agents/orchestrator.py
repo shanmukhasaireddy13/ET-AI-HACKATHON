@@ -3,7 +3,7 @@ from state import AgentState
 from utils.llm import call_gemini_safe
 from datetime import datetime
 
-PLANNER_PROMPT = """You are the SIDD Strategic Planner. You have received structured data extracted by specialized AI agents from a meeting transcript. Your job is to create a comprehensive execution plan.
+PLANNER_PROMPT = """You are the Meeting Mind Strategic Planner. You have received structured data extracted by specialized AI agents from a meeting transcript. Your job is to create a comprehensive execution plan.
 
 ═══ MEETING SUMMARY ═══
 {summary}
@@ -25,15 +25,33 @@ PLANNER_PROMPT = """You are the SIDD Strategic Planner. You have received struct
 
 ═══ YOUR MISSION ═══
 Create a strategic execution directive that:
-1. Prioritizes critical bugs and high-priority tasks first
-2. Schedules events and sets up follow-ups
-3. Ensures all stakeholders are notified via Slack
-4. Creates Jira tickets for tasks and bugs that need tracking
+1. **Differentiates Tool Usage**:
+   - **JIRA**: Use for all technical bugs, pipeline issues, software development tasks, and feature requests.
+   - **NOTION**: Use for general project management, administrative follow-ups, documentation, meeting coordination, and non-technical tasks.
+   - **GOOGLE CALENDAR**: Use for scheduling meetings or time-boxed review sessions.
+   - **SLACK**: Use for notifications after key actions are taken.
+2. **Prevents Duplication**: NEVER create both a Jira ticket and a Notion task for the same item. If an item is technical, Jira is the source of truth.
+3. **Prioritizes**: Critical bugs first, then high-priority features.
+
+═══ AVAILABLE TOOL CAPABILITIES ═══
+- create_jira_ticket: Create new Jira tickets. Use for technical/dev work.
+- update_jira_ticket: Update existing Jira tickets.
+- delete_jira_issue: Delete an existing Jira issue. Use when explicitly asked to "delete" or "remove".
+- transition_jira_issue: Transition an issue status.
+- get_jira_transitions: Discover available status for an issue before transitioning.
+- add_jira_comment: Add a comment to a Jira issue.
+- get_jira_comments: Retrieve recent comments for context.
+- assign_jira_issue: Standalone tool to assign an issue to a user.
+- fetch_project_issues: List all recent issues in a project to check for duplicates.
+- search_jira_issues: Search existing Jira issues using JQL queries.
+- schedule_calendar_event: Schedule Google Calendar events.
+- create_notion_task: Create tasks in Notion. Use for administrative work.
+- send_slack_message: Send Slack notifications.
 
 Return ONLY valid JSON:
 {{
-    "directive": "A comprehensive strategic plan describing what the autonomous agent should execute, in what order, and why.",
-    "reasoning": "Why this plan is optimal.",
+    "directive": "A comprehensive strategic plan describing what the autonomous agent should execute, in what order, and why. Be explicit about which items go to Jira and which go to Notion.",
+    "reasoning": "Explain the tool selection logic (e.g. 'Categorized login crash as a Jira bug and meeting notes as a Notion task to avoid redundancy').",
     "priority_order": ["item1", "item2"],
     "total_actions_expected": 5
 }}
@@ -44,6 +62,11 @@ def orchestrator_node(state: AgentState) -> dict:
     🏁 STRATEGIC PLANNER
     Reads all extracted data from Understanding phase and creates a unified execution plan.
     """
+    # ── RESUMPTION CHECK ──
+    if state.get("orchestrator_reasoning"):
+        print("\n🏁 PLANNER: Resumed State detected. Directive already exists. Skipping.")
+        return {}
+
     print("\n" + "🏁" * 30)
     print("🏁 STRATEGIC PLANNER: Creating execution directive from extracted data...")
     print("🏁" * 30)

@@ -3,20 +3,24 @@ from utils.llm import call_gemini_safe
 from datetime import datetime
 from tools.database import sync_agent_reasoning
 
-BUG_TRACKER_PROMPT = """You are a Bug Tracker AI agent. Your job is to extract all bugs, issues, and defects mentioned in a meeting transcript.
+BUG_TRACKER_PROMPT = """You are a Bug Tracker AI agent. Your job is to extract all technical bugs, software defects, and pipeline/system errors mentioned in a meeting transcript.
 
 Meeting Transcript:
 \"\"\"{transcript}\"\"\"
 
-Extract all bugs/issues. For each, determine:
-- A clear title
+Extract each technical bug/issue. For each, provide:
+- A clear title describing the defect
 - Severity (critical/high/medium/low)
 - Who reported it (if mentioned, otherwise "team")
 
-IMPORTANT: Return ONLY a valid JSON object in this exact format, no other text:
+IMPORTANT RULES:
+- Only extract technical bugs, crashes, error messages, and system failures. 
+- General tasks (like "Update documentation") should be IGNORED here; they are handled by the Task Divider.
+- Do NOT assign existing IDs like "PROJ-123" unless they are explicitly mentioned in the transcript.
+- Return ONLY a valid JSON object in this exact format, no other text:
 {{
     "bugs": [
-        {{"id": "BUG-001", "title": "bug description", "severity": "critical", "reporter": "person or team"}}
+        {{"title": "bug description", "severity": "critical", "reporter": "person or team"}}
     ]
 }}
 """

@@ -61,7 +61,7 @@ export function ActivityFeed() {
           return {
             id: item.id,
             type: item.category as any,
-            actor: item.category === 'agent' ? 'SIDD Agent' : 'System',
+            actor: item.category === 'agent' ? 'Meeting Mind Agent' : 'System',
             description: item.description || item.action,
             timestamp: item.created_at,
             icon: icon,
