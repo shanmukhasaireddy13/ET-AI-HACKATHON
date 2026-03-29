@@ -1,4 +1,4 @@
-# Meeting Mind 🧠 — 100% Agentic AI Workflows
+# Meeting Mind 🧠 — Agentic AI Workflows
 
 Meeting Mind is an autonomous agentic system designed to bridge the gap between human conversation and actionable technical outcomes. It transforms meeting transcripts into structured Jira tickets, Notion tasks, and Google Calendar events without manual intervention.
 
@@ -103,7 +103,6 @@ Follow these steps to run Meeting Mind locally.
    git clone https://github.com/shanmukhasaireddy13/ET-AI-HACKATHON.git
    cd ET-AI-HACKATHON
    ```
-   *Note: Our `main` branch commit history reflects the structured build process and iterative development throughout the hackathon.*
 
 2. **Setup the Agent Engine (Python/FastAPI)**
    ```bash
