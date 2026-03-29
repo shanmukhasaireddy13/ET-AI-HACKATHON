@@ -10,7 +10,7 @@ from main import create_empty_state
 
 def run_loop_verification():
     print("=" * 70)
-    print("🚀 SIDD LOOP VERIFICATION")
+    print("🚀 Meeting Mind LOOP VERIFICATION")
     print("=" * 70)
 
     # 1. Build the graph
