@@ -1,14 +1,15 @@
 import json
 from datetime import datetime
 from state import AgentState
-from tools.external_apis import create_jira_ticket, send_slack_message, schedule_calendar_event
+from tools.external_apis import create_jira_ticket, send_slack_message, schedule_calendar_event, create_notion_task
 from tools.database import save_execution_step, update_execution_step, record_activity
 
 # Mapping tool names to actual Python functions
 TOOL_MAP = {
     "create_jira_ticket": create_jira_ticket,
     "send_slack_message": send_slack_message,
-    "schedule_calendar_event": schedule_calendar_event
+    "schedule_calendar_event": schedule_calendar_event,
+    "create_notion_task": create_notion_task
 }
 
 # Threshold for human intervention (defined by the Brain/Planner risk assessment)
@@ -70,7 +71,7 @@ def execution_node(state: AgentState) -> dict:
         execution_results.append({
             "step": idx,
             "tool": tool_name,
-            "result": {"status": "gated", "message": "Awaiting human approval"}
+            "result": {"status": "gated", "message": "Awaiting human approval — this action is pending review. Move to the next task."}
         })
         
         return {
