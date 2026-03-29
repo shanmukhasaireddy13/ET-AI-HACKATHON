@@ -1,5 +1,0 @@
-streamlit
-huggingface_hub
-python-dotenv
-fastapi
-uvicorn

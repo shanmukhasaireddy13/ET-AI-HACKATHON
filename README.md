@@ -59,9 +59,9 @@ graph TD
 
 | Agent | Core Responsibility | Key Logic / Model |
 | :--- | :--- | :--- |
-| **Synthesizer** | **Context Extraction**: Parses messy meeting transcripts into structured objects (Bugs, Features, Events). | Parallel LLM Extraction (Gemini 1.5 Flash) |
+| **Synthesizer** | **Context Extraction**: Parses messy meeting transcripts into structured objects (Bugs, Features, Events). | Parallel LLM Extraction  |
 | **Orchestrator** | **Strategic Planning**: Sequences tasks based on dependencies and priorities. Creates the `execution_queue`. | Dependency Mapping |
-| **Brain** | **Reasoning (ReAct)**: Analyzes the current state and decides the specific parameters for the next tool call. | Chain-of-Thought (Gemini 1.5 Pro) |
+| **Brain** | **Reasoning (ReAct)**: Analyzes the current state and decides the specific parameters for the next tool call. | Chain-of-Thought  |
 | **Executor** | **Tool Implementation**: A specialized wrapper that communicates with external APIs (Jira, Notion, GCal). | Python SDKs / REST v3 |
 | **Monitor** | **Oversight & Gating**: Validates the output of the Executor. Manages the "Safety Gate" for high-risk actions. | Risk-Based Logic |
 | **Auditor** | **Final Verification**: Generates a unified trace of the entire session and saves it to the long-term memory. | Persistence Layer |
@@ -79,7 +79,7 @@ Meeting Mind integrates with **Jira Cloud SDK**, **Notion API**, and **Google Ca
 ---
 
 ## 🛠️ Tech Stack
-- **AI Core**: LangChain / LangGraph, Google Gemini 1.5 Pro/Flash
+- **AI Core**: LangChain / LangGraph
 - **Backend Core**: FastAPI (Python for Agent Engine), Node.js/Express (Gateway)
 - **Frontend**: React, Next.js, Tailwind CSS
 - **Persistence**: Supabase (PostgreSQL), MongoDB (Archival)
@@ -94,7 +94,7 @@ Follow these steps to run Meeting Mind locally.
 - Python 3.10+
 - Node.js 18+
 - Supabase Account & Credentials
-- API Credentials (Google Gemini API, Jira, Notion)
+- API Credentials (Google  API, Jira, Notion)
 
 ### Installation
 
@@ -114,7 +114,7 @@ Follow these steps to run Meeting Mind locally.
    
    # Duplicate .env.example to .env and configure your keys:
    # cp .env.example .env
-   # Ensure you set GEMINI_API_KEY, JIRA_BASE_URL, etc.
+   
    
    python api.py
    # The Agent Engine will run on http://localhost:8000
