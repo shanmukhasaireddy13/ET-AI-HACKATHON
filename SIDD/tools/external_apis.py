@@ -23,7 +23,7 @@ def _get_integration(service: str) -> dict:
         cur = conn.cursor()
         cur.execute(
             "SELECT id, service, base_url, email, api_token, project_key, status, connected_at, extra FROM integrations WHERE service = %s AND status = 'connected'",
-            (service,)
+            (service.lower(),)
         )
         row = cur.fetchone()
         cur.close()
@@ -164,3 +164,73 @@ def schedule_calendar_event(title: str, time: str, attendees: list) -> dict:
     """Mock function to simulate scheduling a calendar event."""
     print(f"[Tool] 📅 Scheduling Event: '{title}' at {time} with {attendees}")
     return {"status": "success", "event_link": "http://cal.event/456"}
+
+
+# ═════════════════════════════════════════
+#  NOTION — INTEGRATED TASK MANAGEMENT
+# ═════════════════════════════════════════
+
+def create_notion_task(title: str, description: str = "", deadline: str = None, priority: str = "Medium", effort: float = None) -> dict:
+    """
+    Creates a task in Notion. Handles credentials from DB or .env fallback.
+    """
+    integration = _get_integration("notion")
+    
+    if integration:
+        token = integration.get("api_token", "")
+        # Try to find database_id in extra or project_key
+        try:
+            extra = json.loads(integration.get("extra", "{}"))
+            database_id = extra.get("database_id", "")
+        except:
+            database_id = ""
+        
+        if not database_id:
+            database_id = integration.get("project_key", "")
+    else:
+        # Fallback to .env
+        token = os.getenv("NOTION_TOKEN", "")
+        database_id = os.getenv("NOTION_DATABASE_ID", "")
+
+    if not all([token, database_id]):
+        print(f"[Tool] ⚠️  Notion not fully connected (missing token or DB ID) — using mock.")
+        return {"status": "success", "task_id": "MOCK-NOTION-123", "mock": True}
+
+    try:
+        from notion_client import Client
+        notion = Client(auth=token)
+        
+        properties = {
+            "Name": {"title": [{"text": {"content": title}}]}
+        }
+        
+        # Add rich_text description if provided
+        if description:
+            properties["Description"] = {"rich_text": [{"text": {"content": description}}]}
+            
+        # Optional properties (if they exist in the workspace schema)
+        if deadline:
+            properties["Deadline"] = {"date": {"start": deadline}}
+        
+        if priority:
+            # We assume a 'Priority' Select property exists
+            properties["Priority"] = {"select": {"name": priority}}
+            
+        if effort is not None:
+            # We assume an 'Effort (Hours)' Number property exists
+            properties["Effort (Hours)"] = {"number": effort}
+
+        print(f"[Tool] 🔗 Creating Notion task: {title}")
+        response = notion.pages.create(
+            parent={"database_id": database_id.replace("-", "")},
+            properties=properties
+        )
+        
+        task_id = response.get("id")
+        task_url = response.get("url")
+        print(f"[Tool] ✅ Notion task created: {task_id}")
+        return {"status": "success", "task_id": task_id, "url": task_url}
+
+    except Exception as e:
+        print(f"[Tool] ❌ Notion API error: {e}")
+        return {"status": "failed", "error": str(e)}
