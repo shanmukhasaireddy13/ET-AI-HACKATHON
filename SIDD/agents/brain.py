@@ -23,8 +23,9 @@ Follow-ups ({followups_count}): {followups}
 
 ═══ AVAILABLE TOOLS ═══
 1. create_jira_ticket(title: str, description: str) — Creates a Jira ticket for tracking
-2. send_slack_message(channel: str, message: str) — Sends a Slack notification
-3. schedule_calendar_event(title: str, time: str, attendees: list) — Schedules a calendar event
+2. create_notion_task(title: str, description: str, priority: str = "Medium", deadline: str = "TBD") — Creates a task in Notion
+3. send_slack_message(channel: str, message: str) — Sends a Slack notification
+4. schedule_calendar_event(title: str, time: str, attendees: list) — Schedules a calendar event
 
 ═══ REASONING PROTOCOL (ReAct) ═══
 1. **Thought**: What is the next logical action based on the directive, extracted data, and history?
@@ -32,11 +33,13 @@ Follow-ups ({followups_count}): {followups}
 3. **Risk**: Assess criticality (1-10).
    - 1-3: Trivial (Read-only, internal logging)
    - 4-6: Medium (Internal notifications, scheduling)
-   - 7-10: High (Permanent external records like Jira tickets) -> REQUIRES HUMAN GATE.
+   - 7-10: High (Permanent external records like Jira/Notion) -> REQUIRES HUMAN GATE.
 
 ═══ IMPORTANT RULES ═══
 - Use REAL data from the extracted tasks/events/bugs — do NOT invent new items.
 - Execute ONE action at a time so the monitor can verify each step.
+- **NEVER re-propose an action that is currently "gated" or "awaiting human approval"** in the history. If an action is gated, it means it was successfully submitted for review. Move on to the NEXT task in your directive.
+- If ALL tasks in your directive are either "success" or "gated", you have fulfilled your current plan. Set is_goal_achieved to true and summarize.
 - When all items from the directive have been processed, set is_goal_achieved to true.
 
 ═══ OUTPUT FORMAT ═══
