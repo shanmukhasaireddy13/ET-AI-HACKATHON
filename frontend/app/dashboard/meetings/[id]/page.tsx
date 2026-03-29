@@ -106,6 +106,47 @@ export default function MeetingReportPage() {
     setIsDrawerOpen(true);
   };
 
+  const handlePushTask = async (taskId: string, service: "jira" | "notion") => {
+    try {
+      const gatewayUrl = process.env.NEXT_PUBLIC_GATEWAY_URL || "http://localhost:3001";
+      const response = await fetch(`${gatewayUrl}/api/agent/tasks/${taskId}/push`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ service })
+      });
+
+      const res = await response.json();
+      if (res.success) {
+        alert(`Successfully pushed to ${service}!`);
+        // Refresh tasks to show synced status
+        const { data: updatedTasks } = await supabase
+          .from("tasks")
+          .select("*")
+          .eq("meeting_id", meetingId);
+        if (updatedTasks) setTasks(updatedTasks);
+      } else {
+        alert(`Failed to push to ${service}: ${res.error || "Unknown error"}`);
+      }
+    } catch (error) {
+      console.error(`Error pushing to ${service}:`, error);
+      alert(`Error pushing to ${service}. Check console for details.`);
+    }
+  };
+
+  const handlePushAll = async (service: "jira" | "notion") => {
+    const unSyncedTasks = tasks.filter(t => service === "jira" ? !t.jira_key : true); // Notion status not stored yet
+    if (unSyncedTasks.length === 0) {
+      alert(`No new tasks to push to ${service}.`);
+      return;
+    }
+
+    if (confirm(`Push ${unSyncedTasks.length} tasks to ${service}?`)) {
+      for (const task of unSyncedTasks) {
+        await handlePushTask(task.id, service);
+      }
+    }
+  };
+
   const formattedDate = new Date(meeting.created_at).toLocaleDateString("en-US", {
     weekday: "long",
     day: "numeric",
@@ -123,7 +164,12 @@ export default function MeetingReportPage() {
       <div className="max-w-[1280px] mx-auto px-8 py-7 pb-20">
         
         {/* Breadcrumb + Header Actions */}
-        <ReportHeader title={meeting.title} isSyncedWithJira={false} />
+        <ReportHeader 
+          title={meeting.title} 
+          isSyncedWithJira={tasks.length > 0 && tasks.every(t => !!t.jira_key)} 
+          isSyncedWithNotion={false} 
+          onPush={handlePushAll}
+        />
 
         {/* Identity Bar */}
         <IdentityBar 
@@ -171,10 +217,10 @@ export default function MeetingReportPage() {
                 <div onClick={(e) => {
                   const target = e.target as HTMLElement;
                   if (target.closest('tr')) {
-                    // Logic to find the clicked task from the rows could be added here if needed
+                    // Logic for row click
                   }
                 }}>
-                  <TasksTab tasks={tasks} />
+                  <TasksTab tasks={tasks} onPush={handlePushTask} />
                 </div>
               </TabsContent>
               

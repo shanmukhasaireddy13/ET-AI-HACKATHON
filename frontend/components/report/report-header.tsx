@@ -13,9 +13,16 @@ import {
 interface ReportHeaderProps {
   title: string;
   isSyncedWithJira?: boolean;
+  isSyncedWithNotion?: boolean;
+  onPush?: (service: "jira" | "notion") => void;
 }
 
-export function ReportHeader({ title, isSyncedWithJira = false }: ReportHeaderProps) {
+export function ReportHeader({ 
+  title, 
+  isSyncedWithJira = false, 
+  isSyncedWithNotion = false,
+  onPush 
+}: ReportHeaderProps) {
   return (
     <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-5">
       {/* Left: Breadcrumb */}
@@ -64,11 +71,29 @@ export function ReportHeader({ title, isSyncedWithJira = false }: ReportHeaderPr
              Synced with Jira
           </div>
         ) : (
-          <Button className="h-[34px] bg-blue hover:bg-blue-hover text-white text-[13px] font-semibold gap-2 px-4 shadow-sm hover:-translate-y-0.5 transition-all">
+          <Button 
+            onClick={() => onPush?.("jira")}
+            className="h-[34px] bg-blue hover:bg-blue-hover text-white text-[13px] font-semibold gap-2 px-4 shadow-sm hover:-translate-y-0.5 transition-all"
+          >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
               <path d="M11.53 2c0 2.4 1.97 4.35 4.35 4.35h3.69v3.74c0 2.4 1.95 4.35 4.35 4.35V2h-12.39zM1.92 11.51v10.41h10.41c-2.4 0-4.35-1.97-4.35-4.37v-3.67c0-2.4-1.97-4.35-4.35-4.35L1.92 11.51zM11.53 11.51v10.42h10.41v-3.69c0-2.4-1.95-4.35-4.35-4.35h-3.71c-2.4 0-4.35-1.95-4.35-4.37V11.51z"/>
             </svg>
             Push to Jira
+          </Button>
+        )}
+
+        {isSyncedWithNotion ? (
+          <div className="h-[34px] bg-success-bg border border-success-border text-success text-[13px] font-semibold flex items-center gap-2 px-4 rounded-md cursor-default shadow-sm">
+             <CheckCircle2 className="w-3.5 h-3.5" />
+             Synced with Notion
+          </div>
+        ) : (
+          <Button 
+            onClick={() => onPush?.("notion")}
+            className="h-[34px] bg-black hover:bg-zinc-800 text-white text-[13px] font-semibold gap-2 px-4 shadow-sm hover:-translate-y-0.5 transition-all"
+          >
+            <div className="w-4 h-4 rounded bg-white text-black flex items-center justify-center font-bold text-[10px]">N</div>
+            Push to Notion
           </Button>
         )}
       </div>
